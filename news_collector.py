@@ -13,7 +13,6 @@ FEEDS = {
 
 
 def normalize_title(title):
-    """Title को comparison के लिए साफ करता है."""
     title = title.lower()
     title = re.sub(r"[^\w\s]", " ", title)
     title = re.sub(r"\s+", " ", title)
@@ -21,7 +20,6 @@ def normalize_title(title):
 
 
 def get_news(feed_name, feed_url, limit=10):
-    """एक RSS feed से news collect करता है."""
     news_items = []
 
     try:
@@ -39,23 +37,35 @@ def get_news(feed_name, feed_url, limit=10):
         items = root.findall(".//item")
 
         for item in items[:limit]:
-            title = item.findtext("title", default="").strip()
-link = item.findtext("link", default="").strip()
-pub_date = item.findtext("pubDate", default="").strip()
 
-# Google News title के अंत में अक्सर publisher का नाम होता है
-publisher = feed_name
+            title = item.findtext(
+                "title",
+                default=""
+            ).strip()
 
-if " - " in title:
-    title_parts = title.rsplit(" - ", 1)
+            link = item.findtext(
+                "link",
+                default=""
+            ).strip()
 
-    if len(title_parts) == 2:
-        possible_title = title_parts[0].strip()
-        possible_publisher = title_parts[1].strip()
+            pub_date = item.findtext(
+                "pubDate",
+                default=""
+            ).strip()
 
-        if possible_publisher:
-            title = possible_title
-            publisher = possible_publisher
+            # Google News title में अक्सर publisher का नाम
+            # आखिरी " - " के बाद आता है
+            publisher = feed_name
+
+            if " - " in title:
+                title_parts = title.rsplit(" - ", 1)
+
+                possible_title = title_parts[0].strip()
+                possible_publisher = title_parts[1].strip()
+
+                if possible_publisher:
+                    title = possible_title
+                    publisher = possible_publisher
 
             if not title:
                 continue
@@ -67,7 +77,9 @@ if " - " in title:
                     published = parsedate_to_datetime(pub_date)
 
                     if published.tzinfo is None:
-                        published = published.replace(tzinfo=timezone.utc)
+                        published = published.replace(
+                            tzinfo=timezone.utc
+                        )
 
                 except Exception:
                     published = None
@@ -86,13 +98,14 @@ if " - " in title:
 
 
 def collect_all_news():
-    """सभी feeds से news collect करता है."""
     all_news = []
 
     for feed_name, feed_url in FEEDS.items():
+
         print(f"\nCollecting: {feed_name}")
 
         news = get_news(feed_name, feed_url)
+
         all_news.extend(news)
 
         print(f"Found: {len(news)} headlines")
@@ -101,12 +114,14 @@ def collect_all_news():
 
 
 def remove_duplicates(news_items):
-    """Duplicate headlines हटाता है."""
     unique_news = []
     seen_titles = set()
 
     for item in news_items:
-        normalized = normalize_title(item["title"])
+
+        normalized = normalize_title(
+            item["title"]
+        )
 
         if normalized in seen_titles:
             continue
@@ -118,21 +133,21 @@ def remove_duplicates(news_items):
 
 
 def sort_by_date(news_items):
-    """नई news को पहले रखता है."""
     return sorted(
         news_items,
-        key=lambda item: item["published"] or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda item: item["published"]
+        or datetime.min.replace(
+            tzinfo=timezone.utc
+        ),
         reverse=True
     )
 
 
 def select_topic(news_items):
-    """अलग wording वाली related news को पहचानकर priority देता है."""
 
     if not news_items:
         return None
 
-    # बहुत सामान्य शब्द हटाए जाएंगे
     stop_words = {
         "के", "का", "की", "को", "से", "में", "और", "पर",
         "एक", "है", "हैं", "ने", "यह", "इस", "उस",
@@ -144,23 +159,31 @@ def select_topic(news_items):
     scored_news = []
 
     for item in news_items:
+
         title_words = {
             word
-            for word in normalize_title(item["title"]).split()
-            if word not in stop_words and len(word) > 2
+            for word in normalize_title(
+                item["title"]
+            ).split()
+            if word not in stop_words
+            and len(word) > 2
         }
 
         score = 0
         related_count = 0
 
         for other in news_items:
+
             if item is other:
                 continue
 
             other_words = {
                 word
-                for word in normalize_title(other["title"]).split()
-                if word not in stop_words and len(word) > 2
+                for word in normalize_title(
+                    other["title"]
+                ).split()
+                if word not in stop_words
+                and len(word) > 2
             }
 
             if not title_words or not other_words:
@@ -168,32 +191,32 @@ def select_topic(news_items):
 
             common_words = title_words & other_words
 
-            # Jaccard similarity
             similarity = len(common_words) / len(
                 title_words | other_words
             )
 
-            # अगर headlines काफी related हैं
             if similarity >= 0.25 and len(common_words) >= 2:
                 related_count += 1
 
-        # दूसरी related headlines मिलने पर priority
         score += related_count * 3
 
-        # बहुत recent news को extra priority
         if item["published"]:
+
             age_hours = (
-                datetime.now(timezone.utc) - item["published"]
+                datetime.now(timezone.utc)
+                - item["published"]
             ).total_seconds() / 3600
 
             if age_hours <= 6:
                 score += 2
+
             elif age_hours <= 12:
                 score += 1
 
-        scored_news.append((score, item, related_count))
+        scored_news.append(
+            (score, item, related_count)
+        )
 
-    # सबसे ज्यादा score वाली news पहले
     scored_news.sort(
         key=lambda x: x[0],
         reverse=True
@@ -206,26 +229,36 @@ def select_topic(news_items):
 
     return selected
 
+
 def main():
+
     print("\n===================================")
     print("       NEWS TOPIC SELECTOR")
     print("===================================")
 
-    # 1. सभी feeds से news
     all_news = collect_all_news()
 
-    print(f"\nTotal headlines collected: {len(all_news)}")
+    print(
+        f"\nTotal headlines collected: "
+        f"{len(all_news)}"
+    )
 
-    # 2. Duplicate हटाना
-    unique_news = remove_duplicates(all_news)
+    unique_news = remove_duplicates(
+        all_news
+    )
 
-    print(f"After duplicate removal: {len(unique_news)}")
+    print(
+        f"After duplicate removal: "
+        f"{len(unique_news)}"
+    )
 
-    # 3. Date के हिसाब से sort
-    sorted_news = sort_by_date(unique_news)
+    sorted_news = sort_by_date(
+        unique_news
+    )
 
-    # 4. Topic select
-    selected = select_topic(sorted_news)
+    selected = select_topic(
+        sorted_news
+    )
 
     if not selected:
         print("\nNo topic selected.")
@@ -235,12 +268,22 @@ def main():
     print("        SELECTED TOPIC")
     print("===================================")
 
-    print(f"\nHeadline: {selected['title']}")
-    print(f"Source: {selected['source']}")
-    print(f"Link: {selected['link']}")
+    print(
+        f"\nHeadline: {selected['title']}"
+    )
+
+    print(
+        f"Source: {selected['source']}"
+    )
+
+    print(
+        f"Link: {selected['link']}"
+    )
 
     if selected["published"]:
-        print(f"Published: {selected['published']}")
+        print(
+            f"Published: {selected['published']}"
+        )
 
     print("\n===================================")
     print("Topic selection completed.")
