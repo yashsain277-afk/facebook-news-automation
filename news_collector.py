@@ -40,8 +40,22 @@ def get_news(feed_name, feed_url, limit=10):
 
         for item in items[:limit]:
             title = item.findtext("title", default="").strip()
-            link = item.findtext("link", default="").strip()
-            pub_date = item.findtext("pubDate", default="").strip()
+link = item.findtext("link", default="").strip()
+pub_date = item.findtext("pubDate", default="").strip()
+
+# Google News title के अंत में अक्सर publisher का नाम होता है
+publisher = feed_name
+
+if " - " in title:
+    title_parts = title.rsplit(" - ", 1)
+
+    if len(title_parts) == 2:
+        possible_title = title_parts[0].strip()
+        possible_publisher = title_parts[1].strip()
+
+        if possible_publisher:
+            title = possible_title
+            publisher = possible_publisher
 
             if not title:
                 continue
@@ -61,7 +75,7 @@ def get_news(feed_name, feed_url, limit=10):
             news_items.append({
                 "title": title,
                 "link": link,
-                "source": feed_name,
+                "source": publisher,
                 "published": published,
             })
 
