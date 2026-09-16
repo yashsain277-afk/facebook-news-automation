@@ -113,14 +113,55 @@ def sort_by_date(news_items):
 
 
 def select_topic(news_items):
-    """एक recent candidate topic select करता है."""
+    """Multiple sources में आने वाली news को priority देता है."""
 
     if not news_items:
         return None
 
-    # अभी simple selection:
-    # सबसे recent unique headline को candidate topic माना जाएगा.
-    selected = news_items[0]
+    # सभी headlines के words की तुलना करेंगे
+    scored_news = []
+
+    for item in news_items:
+        title_words = set(normalize_title(item["title"]).split())
+
+        score = 0
+
+        # दूसरी headlines से similarity check
+        for other in news_items:
+            if item is other:
+                continue
+
+            other_words = set(normalize_title(other["title"]).split())
+
+            common_words = title_words & other_words
+
+            # कम-से-कम 3 common words मिलने पर
+            # इसे related news माना जाएगा
+            if len(common_words) >= 3:
+                score += 1
+
+        # ज्यादा recent news को थोड़ा extra importance
+        if item["published"]:
+            age_hours = (
+                datetime.now(timezone.utc) - item["published"]
+            ).total_seconds() / 3600
+
+            if age_hours <= 6:
+                score += 2
+            elif age_hours <= 12:
+                score += 1
+
+        scored_news.append((score, item))
+
+    # सबसे ज्यादा score वाली news ऊपर
+    scored_news.sort(
+        key=lambda x: x[0],
+        reverse=True
+    )
+
+    selected_score, selected = scored_news[0]
+
+    print(f"\nSelected topic score: {selected_score}")
 
     return selected
 
