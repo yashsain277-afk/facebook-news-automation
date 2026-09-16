@@ -5,6 +5,8 @@ from email.utils import parsedate_to_datetime
 
 FEEDS = {
     "Google News India": "https://news.google.com/rss?hl=hi&gl=IN&ceid=IN:hi",
+    "Google News Technology": "https://news.google.com/rss/search?q=technology&hl=hi&gl=IN&ceid=IN:hi",
+    "Google News India Politics": "https://news.google.com/rss/search?q=india%20politics&hl=hi&gl=IN&ceid=IN:hi",
 }
 
 
