@@ -1,6 +1,8 @@
 import urllib.request
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
+from datetime import datetime, timezone
+import re
 
 
 FEEDS = {
@@ -10,8 +12,17 @@ FEEDS = {
 }
 
 
+def normalize_title(title):
+    """Title को comparison के लिए साफ करता है."""
+    title = title.lower()
+    title = re.sub(r"[^\w\s]", " ", title)
+    title = re.sub(r"\s+", " ", title)
+    return title.strip()
+
+
 def get_news(feed_name, feed_url, limit=10):
-    print(f"\n===== {feed_name} =====")
+    """एक RSS feed से news collect करता है."""
+    news_items = []
 
     try:
         request = urllib.request.Request(
@@ -25,32 +36,135 @@ def get_news(feed_name, feed_url, limit=10):
             data = response.read()
 
         root = ET.fromstring(data)
-
         items = root.findall(".//item")
 
-        if not items:
-            print("No news items found.")
-            return
-
-        for i, item in enumerate(items[:limit], start=1):
+        for item in items[:limit]:
             title = item.findtext("title", default="").strip()
             link = item.findtext("link", default="").strip()
             pub_date = item.findtext("pubDate", default="").strip()
 
-            print(f"\n{i}. {title}")
-            print(f"   Link: {link}")
+            if not title:
+                continue
+
+            published = None
 
             if pub_date:
                 try:
-                    dt = parsedate_to_datetime(pub_date)
-                    print(f"   Date: {dt}")
+                    published = parsedate_to_datetime(pub_date)
+
+                    if published.tzinfo is None:
+                        published = published.replace(tzinfo=timezone.utc)
+
                 except Exception:
-                    print(f"   Date: {pub_date}")
+                    published = None
+
+            news_items.append({
+                "title": title,
+                "link": link,
+                "source": feed_name,
+                "published": published,
+            })
 
     except Exception as e:
-        print(f"ERROR: {e}")
+        print(f"ERROR in {feed_name}: {e}")
+
+    return news_items
+
+
+def collect_all_news():
+    """सभी feeds से news collect करता है."""
+    all_news = []
+
+    for feed_name, feed_url in FEEDS.items():
+        print(f"\nCollecting: {feed_name}")
+
+        news = get_news(feed_name, feed_url)
+        all_news.extend(news)
+
+        print(f"Found: {len(news)} headlines")
+
+    return all_news
+
+
+def remove_duplicates(news_items):
+    """Duplicate headlines हटाता है."""
+    unique_news = []
+    seen_titles = set()
+
+    for item in news_items:
+        normalized = normalize_title(item["title"])
+
+        if normalized in seen_titles:
+            continue
+
+        seen_titles.add(normalized)
+        unique_news.append(item)
+
+    return unique_news
+
+
+def sort_by_date(news_items):
+    """नई news को पहले रखता है."""
+    return sorted(
+        news_items,
+        key=lambda item: item["published"] or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True
+    )
+
+
+def select_topic(news_items):
+    """एक recent candidate topic select करता है."""
+
+    if not news_items:
+        return None
+
+    # अभी simple selection:
+    # सबसे recent unique headline को candidate topic माना जाएगा.
+    selected = news_items[0]
+
+    return selected
+
+
+def main():
+    print("\n===================================")
+    print("       NEWS TOPIC SELECTOR")
+    print("===================================")
+
+    # 1. सभी feeds से news
+    all_news = collect_all_news()
+
+    print(f"\nTotal headlines collected: {len(all_news)}")
+
+    # 2. Duplicate हटाना
+    unique_news = remove_duplicates(all_news)
+
+    print(f"After duplicate removal: {len(unique_news)}")
+
+    # 3. Date के हिसाब से sort
+    sorted_news = sort_by_date(unique_news)
+
+    # 4. Topic select
+    selected = select_topic(sorted_news)
+
+    if not selected:
+        print("\nNo topic selected.")
+        return
+
+    print("\n===================================")
+    print("        SELECTED TOPIC")
+    print("===================================")
+
+    print(f"\nHeadline: {selected['title']}")
+    print(f"Source: {selected['source']}")
+    print(f"Link: {selected['link']}")
+
+    if selected["published"]:
+        print(f"Published: {selected['published']}")
+
+    print("\n===================================")
+    print("Topic selection completed.")
+    print("===================================")
 
 
 if __name__ == "__main__":
-    for feed_name, feed_url in FEEDS.items():
-        get_news(feed_name, feed_url)
+    main()
