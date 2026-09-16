@@ -1,7 +1,9 @@
 import os
-import urllib.parse
+import json
 import urllib.request
 import subprocess
+import uuid
+
 
 from news_collector import (
     collect_all_news,
@@ -14,20 +16,44 @@ from news_collector import (
 PAGE_ID = os.environ["FB_PAGE_ID"]
 ACCESS_TOKEN = os.environ["FB_PAGE_ACCESS_TOKEN"]
 
+POSTED_FILE = "posted_news.json"
+
+
+# पहले पोस्ट की गई खबरें पढ़ें
+try:
+    with open(POSTED_FILE, "r", encoding="utf-8") as file:
+        posted_news = json.load(file)
+except Exception:
+    posted_news = []
+
 
 # News collect करें
 all_news = collect_all_news()
 unique_news = remove_duplicates(all_news)
 sorted_news = sort_by_date(unique_news)
-selected = select_topic(sorted_news)
+
+
+# पहले से पोस्ट की गई खबरों को छोड़कर नई खबर चुनें
+selected = None
+
+for item in sorted_news:
+    if item["link"] not in posted_news:
+        selected = item
+        break
+
 
 if not selected:
-    raise RuntimeError("कोई news topic नहीं मिला")
+    raise RuntimeError("कोई नई news नहीं मिली")
 
 
 headline = selected["title"]
 source = selected["source"]
 link = selected["link"]
+
+
+print("\nSelected NEW NEWS:")
+print(headline)
+print(link)
 
 
 # News image बनाएं
@@ -50,62 +76,71 @@ message = f"""📰 आज की बड़ी खबर
 """
 
 
-# पहले image Facebook पर upload करें
+# Facebook photo upload URL
 photo_url = f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos"
 
-photo_data = urllib.parse.urlencode({
-    "caption": message,
-    "access_token": ACCESS_TOKEN,
-}).encode("utf-8")
 
+# Image को multipart form में तैयार करें
+boundary = uuid.uuid4().hex
 
 with open("news_image.jpg", "rb") as image_file:
 
-    request = urllib.request.Request(
-        photo_url,
-        data=photo_data,
-        method="POST"
+    image_data = image_file.read()
+
+
+body = (
+    f"--{boundary}\r\n"
+    f'Content-Disposition: form-data; name="caption"\r\n\r\n'
+    f"{message}\r\n"
+    f"--{boundary}\r\n"
+    f'Content-Disposition: form-data; name="access_token"\r\n\r\n'
+    f"{ACCESS_TOKEN}\r\n"
+    f"--{boundary}\r\n"
+    f'Content-Disposition: form-data; name="source"; filename="news_image.jpg"\r\n'
+    f"Content-Type: image/jpeg\r\n\r\n"
+).encode("utf-8")
+
+body += image_data
+body += f"\r\n--{boundary}--\r\n".encode("utf-8")
+
+
+request = urllib.request.Request(
+    photo_url,
+    data=body,
+    headers={
+        "Content-Type": f"multipart/form-data; boundary={boundary}"
+    },
+    method="POST"
+)
+
+
+# Facebook पर post करें
+try:
+
+    with urllib.request.urlopen(request, timeout=60) as response:
+        result = response.read().decode("utf-8")
+
+    print("\nFacebook image post successful:")
+    print(result)
+
+except Exception as e:
+
+    print("\nFacebook image post failed:")
+    print(e)
+    raise
+
+
+# Successful post के बाद खबर को save करें
+posted_news.append(link)
+
+with open(POSTED_FILE, "w", encoding="utf-8") as file:
+    json.dump(
+        posted_news,
+        file,
+        ensure_ascii=False,
+        indent=2
     )
 
-    # multipart upload के लिए अलग request बनाएँ
-    import http.client
-    import uuid
 
-    boundary = uuid.uuid4().hex
-
-    body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="caption"\r\n\r\n'
-        f"{message}\r\n"
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="access_token"\r\n\r\n'
-        f"{ACCESS_TOKEN}\r\n"
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="source"; filename="news_image.jpg"\r\n'
-        f"Content-Type: image/jpeg\r\n\r\n"
-    ).encode("utf-8")
-
-    body += image_file.read()
-
-    body += f"\r\n--{boundary}--\r\n".encode("utf-8")
-
-    request = urllib.request.Request(
-        photo_url,
-        data=body,
-        headers={
-            "Content-Type": f"multipart/form-data; boundary={boundary}"
-        },
-        method="POST"
-    )
-
-    try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            result = response.read().decode("utf-8")
-
-        print("Facebook image post successful:")
-        print(result)
-
-    except Exception as e:
-        print("Facebook image post failed:")
-        print(e)
-        raise
+print("\nNews saved to posted_news.json")
+print("Duplicate protection completed.")
