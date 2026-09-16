@@ -10,6 +10,7 @@ from news_collector import (
     remove_duplicates,
     sort_by_date,
     select_topic,
+    normalize_title,
 )
 
 
