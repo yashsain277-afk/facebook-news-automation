@@ -113,34 +113,60 @@ def sort_by_date(news_items):
 
 
 def select_topic(news_items):
-    """Multiple sources में आने वाली news को priority देता है."""
+    """अलग wording वाली related news को पहचानकर priority देता है."""
 
     if not news_items:
         return None
 
-    # सभी headlines के words की तुलना करेंगे
+    # बहुत सामान्य शब्द हटाए जाएंगे
+    stop_words = {
+        "के", "का", "की", "को", "से", "में", "और", "पर",
+        "एक", "है", "हैं", "ने", "यह", "इस", "उस",
+        "लिए", "बारे", "बाद", "अब", "भी", "तो",
+        "the", "a", "an", "and", "of", "in", "to",
+        "is", "on", "for"
+    }
+
     scored_news = []
 
     for item in news_items:
-        title_words = set(normalize_title(item["title"]).split())
+        title_words = {
+            word
+            for word in normalize_title(item["title"]).split()
+            if word not in stop_words and len(word) > 2
+        }
 
         score = 0
+        related_count = 0
 
-        # दूसरी headlines से similarity check
         for other in news_items:
             if item is other:
                 continue
 
-            other_words = set(normalize_title(other["title"]).split())
+            other_words = {
+                word
+                for word in normalize_title(other["title"]).split()
+                if word not in stop_words and len(word) > 2
+            }
+
+            if not title_words or not other_words:
+                continue
 
             common_words = title_words & other_words
 
-            # कम-से-कम 3 common words मिलने पर
-            # इसे related news माना जाएगा
-            if len(common_words) >= 3:
-                score += 1
+            # Jaccard similarity
+            similarity = len(common_words) / len(
+                title_words | other_words
+            )
 
-        # ज्यादा recent news को थोड़ा extra importance
+            # अगर headlines काफी related हैं
+            if similarity >= 0.25 and len(common_words) >= 2:
+                related_count += 1
+
+        # दूसरी related headlines मिलने पर priority
+        score += related_count * 3
+
+        # बहुत recent news को extra priority
         if item["published"]:
             age_hours = (
                 datetime.now(timezone.utc) - item["published"]
@@ -151,20 +177,20 @@ def select_topic(news_items):
             elif age_hours <= 12:
                 score += 1
 
-        scored_news.append((score, item))
+        scored_news.append((score, item, related_count))
 
-    # सबसे ज्यादा score वाली news ऊपर
+    # सबसे ज्यादा score वाली news पहले
     scored_news.sort(
         key=lambda x: x[0],
         reverse=True
     )
 
-    selected_score, selected = scored_news[0]
+    selected_score, selected, related_count = scored_news[0]
 
     print(f"\nSelected topic score: {selected_score}")
+    print(f"Related headlines found: {related_count}")
 
     return selected
-
 
 def main():
     print("\n===================================")
