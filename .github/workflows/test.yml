@@ -16,7 +16,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Test Facebook post
+      - name: Install Pillow
+        run: pip install Pillow
         env:
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
