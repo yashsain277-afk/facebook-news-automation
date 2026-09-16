@@ -1,6 +1,7 @@
 import os
 import urllib.parse
 import urllib.request
+import subprocess
 
 from news_collector import (
     collect_all_news,
@@ -16,14 +17,8 @@ ACCESS_TOKEN = os.environ["FB_PAGE_ACCESS_TOKEN"]
 
 # News collect करें
 all_news = collect_all_news()
-
-# Duplicate हटाएँ
 unique_news = remove_duplicates(all_news)
-
-# नई news पहले
 sorted_news = sort_by_date(unique_news)
-
-# Trending/important topic चुनें
 selected = select_topic(sorted_news)
 
 if not selected:
@@ -33,6 +28,13 @@ if not selected:
 headline = selected["title"]
 source = selected["source"]
 link = selected["link"]
+
+
+# News image बनाएं
+subprocess.run(
+    ["python", "image_generator.py", headline],
+    check=True
+)
 
 
 message = f"""📰 आज की बड़ी खबर
@@ -48,28 +50,62 @@ message = f"""📰 आज की बड़ी खबर
 """
 
 
-url = f"https://graph.facebook.com/v26.0/{PAGE_ID}/feed"
+# पहले image Facebook पर upload करें
+photo_url = f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos"
 
-data = urllib.parse.urlencode({
-    "message": message,
+photo_data = urllib.parse.urlencode({
+    "caption": message,
     "access_token": ACCESS_TOKEN,
 }).encode("utf-8")
 
 
-request = urllib.request.Request(
-    url,
-    data=data,
-    method="POST"
-)
+with open("news_image.jpg", "rb") as image_file:
 
+    request = urllib.request.Request(
+        photo_url,
+        data=photo_data,
+        method="POST"
+    )
 
-try:
-    with urllib.request.urlopen(request, timeout=30) as response:
-        result = response.read().decode("utf-8")
+    # multipart upload के लिए अलग request बनाएँ
+    import http.client
+    import uuid
 
-    print("Facebook post successful:")
-    print(result)
+    boundary = uuid.uuid4().hex
 
-except Exception as e:
-    print("Facebook post failed:")
-    print(e)
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="caption"\r\n\r\n'
+        f"{message}\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="access_token"\r\n\r\n'
+        f"{ACCESS_TOKEN}\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="source"; filename="news_image.jpg"\r\n'
+        f"Content-Type: image/jpeg\r\n\r\n"
+    ).encode("utf-8")
+
+    body += image_file.read()
+
+    body += f"\r\n--{boundary}--\r\n".encode("utf-8")
+
+    request = urllib.request.Request(
+        photo_url,
+        data=body,
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            result = response.read().decode("utf-8")
+
+        print("Facebook image post successful:")
+        print(result)
+
+    except Exception as e:
+        print("Facebook image post failed:")
+        print(e)
+        raise
