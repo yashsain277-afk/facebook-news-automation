@@ -123,6 +123,18 @@ try:
     print("\nFacebook image post successful:")
     print(result)
 
+except urllib.error.HTTPError as e:
+
+    print("\nFacebook image post failed:")
+    print("HTTP Status:", e.code)
+
+    error_body = e.read().decode("utf-8", errors="replace")
+
+    print("Facebook error response:")
+    print(error_body)
+
+    raise
+
 except Exception as e:
 
     print("\nFacebook image post failed:")
