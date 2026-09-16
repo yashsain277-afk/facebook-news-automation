@@ -37,10 +37,24 @@ sorted_news = sort_by_date(unique_news)
 selected = None
 
 for item in sorted_news:
-    if item["link"] not in posted_news:
+
+    normalized_title = normalize_title(item["title"])
+
+    already_posted = False
+
+    for posted in posted_news:
+
+        if posted.get("link") == item["link"]:
+            already_posted = True
+            break
+
+        if posted.get("title") == normalized_title:
+            already_posted = True
+            break
+
+    if not already_posted:
         selected = item
         break
-
 
 if not selected:
     raise RuntimeError("कोई नई news नहीं मिली")
