@@ -20,10 +20,13 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-
-      - name: Install Pillow
-        run: pip install Pillow
+          python-version: "3.12" 
+        - name: Install Hindi font
+  run: |
+    sudo apt-get update
+    sudo apt-get install -y fonts-noto-core 
+- name: Install Pillow
+  run: pip install Pillow
 
       - name: Collect news
         run: python news_collector.py
