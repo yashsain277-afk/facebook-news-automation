@@ -148,8 +148,6 @@ subprocess.run(
 # Facebook caption
 message = """📰 आज की 10 बड़ी खबरें
 
-पूरी headlines image में देखें।
-
 #VeenaNews #HindiNews #News"""
 
 
