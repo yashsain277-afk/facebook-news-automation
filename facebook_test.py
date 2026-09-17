@@ -146,36 +146,11 @@ subprocess.run(
 
 
 # Facebook caption
-caption_lines = [
-    "📰 आज की बड़ी खबरें",
-    ""
-]
+message = """📰 आज की 10 बड़ी खबरें
 
+पूरी headlines image में देखें।
 
-for index, item in enumerate(
-    selected_news,
-    start=1
-):
-
-    caption_lines.append(
-        f"{index}. {item['title']}"
-    )
-
-    caption_lines.append(
-        f"स्रोत: {item['source']}"
-    )
-
-    caption_lines.append("")
-
-
-caption_lines.append(
-    "#VeenaNews #News #HindiNews"
-)
-
-
-message = "\n".join(
-    caption_lines
-)
+#VeenaNews #HindiNews #News"""
 
 
 # Facebook photo upload URL
