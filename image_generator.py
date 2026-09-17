@@ -8,9 +8,12 @@ import unicodedata
 # INPUT
 # =========================================================
 
+if len(sys.argv) < 2:
+    raise ValueError("Headlines input नहीं मिला")
+
 headlines_text = sys.argv[1]
 
-raw_headlines = [
+headlines = [
     line.strip()
     for line in headlines_text.split("\n")
     if line.strip()
@@ -40,14 +43,30 @@ background = Image.open(
     BACKGROUND
 ).convert("RGB")
 
-background = ImageOps.fit(
+
+# Background को पूरा canvas में fit करें
+# इससे logo वाला हिस्सा अनावश्यक रूप से crop नहीं होगा।
+
+background = ImageOps.contain(
     background,
     (WIDTH, HEIGHT),
-    method=Image.Resampling.LANCZOS,
-    centering=(0.5, 0.5)
+    method=Image.Resampling.LANCZOS
 )
 
-canvas = background.copy()
+canvas = Image.new(
+    "RGB",
+    (WIDTH, HEIGHT),
+    "white"
+)
+
+bg_x = (WIDTH - background.width) // 2
+bg_y = (HEIGHT - background.height) // 2
+
+canvas.paste(
+    background,
+    (bg_x, bg_y)
+)
+
 draw = ImageDraw.Draw(canvas)
 
 
@@ -79,54 +98,55 @@ def get_font(path, size):
 
 
 # =========================================================
-# SAFE UNICODE CLEANING
+# COLORS
+# =========================================================
+
+WHITE = (255, 255, 255)
+BLACK = (15, 20, 30)
+
+RED = (218, 20, 28)
+
+BLUE = (10, 48, 125)
+
+LINE_COLOR = (205, 210, 218)
+
+
+# =========================================================
+# CLEAN TEXT
 # =========================================================
 
 def clean_headline(text):
 
-    # Unicode normalization
     text = unicodedata.normalize(
         "NFC",
         text
     )
 
-    cleaned = []
+    output = []
 
     for char in text:
 
         code = ord(char)
 
-        # -----------------------------------------
-        # Devanagari
-        # -----------------------------------------
-
+        # Hindi / Devanagari
         if 0x0900 <= code <= 0x097F:
-            cleaned.append(char)
+            output.append(char)
             continue
 
-        # -----------------------------------------
-        # English A-Z / a-z
-        # -----------------------------------------
-
+        # English
         if (
             65 <= code <= 90
             or 97 <= code <= 122
         ):
-            cleaned.append(char)
+            output.append(char)
             continue
 
-        # -----------------------------------------
         # Numbers
-        # -----------------------------------------
-
         if 48 <= code <= 57:
-            cleaned.append(char)
+            output.append(char)
             continue
 
-        # -----------------------------------------
         # Common punctuation
-        # -----------------------------------------
-
         if char in (
             " ",
             ".",
@@ -148,19 +168,16 @@ def clean_headline(text):
             '"',
             "+",
             "&",
+            "@"
         ):
-            cleaned.append(char)
+            output.append(char)
             continue
 
-        # -----------------------------------------
-        # Everything else removed
-        # -----------------------------------------
+        # Unsupported character
+        output.append(" ")
 
-        cleaned.append(" ")
+    result = "".join(output)
 
-    result = "".join(cleaned)
-
-    # Multiple spaces remove
     result = " ".join(
         result.split()
     )
@@ -169,21 +186,116 @@ def clean_headline(text):
 
 
 # =========================================================
-# CLEAN HEADLINES
+# CLEAN ALL HEADLINES
 # =========================================================
 
-headlines = []
+cleaned_headlines = []
 
-for headline in raw_headlines:
+for headline in headlines:
 
     cleaned = clean_headline(
         headline
     )
 
     if cleaned:
-        headlines.append(cleaned)
+        cleaned_headlines.append(
+            cleaned
+        )
 
-headlines = headlines[:10]
+headlines = cleaned_headlines[:10]
+
+
+# =========================================================
+# MAIN WHITE NEWS PANEL
+# =========================================================
+
+PANEL_LEFT = 30
+PANEL_TOP = 165
+PANEL_RIGHT = 1170
+PANEL_BOTTOM = 770
+
+draw.rounded_rectangle(
+    [
+        PANEL_LEFT,
+        PANEL_TOP,
+        PANEL_RIGHT,
+        PANEL_BOTTOM
+    ],
+    radius=8,
+    fill=WHITE
+)
+
+
+# =========================================================
+# RED TITLE BANNER
+# =========================================================
+
+BANNER_LEFT = 190
+BANNER_TOP = 155
+BANNER_RIGHT = 1010
+BANNER_BOTTOM = 255
+
+
+draw.rounded_rectangle(
+    [
+        BANNER_LEFT,
+        BANNER_TOP,
+        BANNER_RIGHT,
+        BANNER_BOTTOM
+    ],
+    radius=18,
+    fill=RED
+)
+
+
+# =========================================================
+# BLUE LEFT ACCENT
+# =========================================================
+
+draw.polygon(
+    [
+        (155, 170),
+        (178, 170),
+        (155, 235),
+        (132, 235)
+    ],
+    fill=BLUE
+)
+
+draw.polygon(
+    [
+        (182, 170),
+        (205, 170),
+        (182, 235),
+        (159, 235)
+    ],
+    fill=BLUE
+)
+
+
+# =========================================================
+# BLUE RIGHT ACCENT
+# =========================================================
+
+draw.polygon(
+    [
+        (1015, 170),
+        (1038, 170),
+        (1060, 235),
+        (1037, 235)
+    ],
+    fill=BLUE
+)
+
+draw.polygon(
+    [
+        (1042, 170),
+        (1065, 170),
+        (1087, 235),
+        (1064, 235)
+    ],
+    fill=BLUE
+)
 
 
 # =========================================================
@@ -192,13 +304,47 @@ headlines = headlines[:10]
 
 title_font = get_font(
     HINDI_BOLD,
-    30
+    54
+)
+
+title = "आज की 10 बड़ी खबरें"
+
+title_box = draw.textbbox(
+    (0, 0),
+    title,
+    font=title_font
+)
+
+title_width = (
+    title_box[2]
+    - title_box[0]
+)
+
+title_height = (
+    title_box[3]
+    - title_box[1]
+)
+
+title_x = (
+    (BANNER_LEFT + BANNER_RIGHT)
+    // 2
+    - title_width // 2
+)
+
+title_y = (
+    (BANNER_TOP + BANNER_BOTTOM)
+    // 2
+    - title_height // 2
+    - 4
 )
 
 draw.text(
-    (70, 268),
-    "आज की 10 बड़ी खबरें",
-    fill="black",
+    (
+        title_x,
+        title_y
+    ),
+    title,
+    fill=WHITE,
     font=title_font
 )
 
@@ -207,25 +353,26 @@ draw.text(
 # HEADLINE AREA
 # =========================================================
 
-NUMBER_X = 52
-TEXT_X = 100
+NUMBER_CENTER_X = 105
 
-MAX_WIDTH = 1030
+TEXT_X = 145
 
-START_Y = 314
+TEXT_RIGHT = 1135
 
-AVAILABLE_HEIGHT = 360
+START_Y = 275
+
+END_Y = 680
 
 ROW_HEIGHT = (
-    AVAILABLE_HEIGHT / 10
-)
+    END_Y - START_Y
+) / 10
 
 
 # =========================================================
 # TEXT WIDTH
 # =========================================================
 
-def get_text_width(
+def text_width(
     text,
     current_font
 ):
@@ -236,7 +383,10 @@ def get_text_width(
         font=current_font
     )
 
-    return box[2] - box[0]
+    return (
+        box[2]
+        - box[0]
+    )
 
 
 # =========================================================
@@ -253,54 +403,59 @@ def wrap_text(
 
     lines = []
 
-    current = ""
+    current_line = ""
 
     for word in words:
 
-        test = (
+        test_line = (
             word
-            if not current
-            else current + " " + word
+            if not current_line
+            else current_line + " " + word
         )
 
-        if get_text_width(
-            test,
+        if text_width(
+            test_line,
             current_font
         ) <= max_width:
 
-            current = test
+            current_line = test_line
 
         else:
 
-            if current:
+            if current_line:
                 lines.append(
-                    current
+                    current_line
                 )
 
-            current = word
+            current_line = word
 
-    if current:
+    if current_line:
         lines.append(
-            current
+            current_line
         )
 
     return lines
 
 
 # =========================================================
-# FIND BEST FONT SIZE
+# BEST FONT SIZE
 # =========================================================
 
 def fit_headline(text):
 
-    # बड़े से छोटे font तक try करें
+    max_width = (
+        TEXT_RIGHT - TEXT_X
+    )
+
+    # बड़ा font पहले
     for size in (
+        25,
+        24,
+        23,
+        22,
         21,
         20,
-        19,
-        18,
-        17,
-        16
+        19
     ):
 
         current_font = get_font(
@@ -311,51 +466,55 @@ def fit_headline(text):
         lines = wrap_text(
             text,
             current_font,
-            MAX_WIDTH
+            max_width
         )
 
-        # Maximum 2 lines
         if len(lines) <= 2:
             return lines, current_font
 
-    # बहुत ज्यादा लंबी headline
+
+    # बहुत लंबी headline
     current_font = get_font(
         HINDI_REGULAR,
-        16
+        19
     )
 
     lines = wrap_text(
         text,
         current_font,
-        MAX_WIDTH
+        max_width
     )
 
+
+    # Maximum 2 lines
     if len(lines) > 2:
 
         lines = lines[:2]
 
-        last = lines[1]
+        last_line = lines[1]
 
+        # दूसरी line को width के अंदर रखें
         while (
-            get_text_width(
-                last + "...",
+            text_width(
+                last_line + "...",
                 current_font
-            ) > MAX_WIDTH
-            and len(last) > 5
+            ) > max_width
+            and len(last_line) > 5
         ):
 
-            last = last[:-1]
+            last_line = last_line[:-1]
 
         lines[1] = (
-            last.rstrip()
+            last_line.rstrip()
             + "..."
         )
+
 
     return lines, current_font
 
 
 # =========================================================
-# DRAW 10 HEADLINES
+# DRAW HEADLINES
 # =========================================================
 
 for index, headline in enumerate(
@@ -364,7 +523,7 @@ for index, headline in enumerate(
 ):
 
     # -----------------------------------------
-    # Position
+    # Row position
     # -----------------------------------------
 
     y = START_Y + int(
@@ -372,38 +531,80 @@ for index, headline in enumerate(
         * ROW_HEIGHT
     )
 
+
     # -----------------------------------------
-    # Number
+    # RED NUMBER CIRCLE
+    # -----------------------------------------
+
+    radius = 23
+
+    circle_center_x = NUMBER_CENTER_X
+
+    circle_center_y = (
+        y + 20
+    )
+
+    draw.ellipse(
+        [
+            circle_center_x - radius,
+            circle_center_y - radius,
+            circle_center_x + radius,
+            circle_center_y + radius
+        ],
+        fill=RED
+    )
+
+
+    # -----------------------------------------
+    # NUMBER
     # -----------------------------------------
 
     number_font = get_font(
         ENGLISH_BOLD,
-        17
+        23
+    )
+
+    number = str(index)
+
+    number_box = draw.textbbox(
+        (0, 0),
+        number,
+        font=number_font
+    )
+
+    number_width = (
+        number_box[2]
+        - number_box[0]
+    )
+
+    number_height = (
+        number_box[3]
+        - number_box[1]
     )
 
     draw.text(
         (
-            NUMBER_X,
-            y + 1
+            circle_center_x
+            - number_width // 2,
+            circle_center_y
+            - number_height // 2
+            - 3
         ),
-        f"{index}.",
-        fill="black",
+        number,
+        fill=WHITE,
         font=number_font
     )
 
+
     # -----------------------------------------
-    # Headline font + wrapping
+    # HEADLINE
     # -----------------------------------------
 
     lines, headline_font = fit_headline(
         headline
     )
 
-    # -----------------------------------------
-    # Draw headline
-    # -----------------------------------------
-
-    line_y = y
+    line_y = y - 2
 
     for line in lines:
 
@@ -413,51 +614,103 @@ for index, headline in enumerate(
                 line_y
             ),
             line,
-            fill="black",
+            fill=BLACK,
             font=headline_font
         )
 
-        line_y += 17
+        line_y += 24
+
 
     # -----------------------------------------
-    # Divider
+    # DIVIDER
     # -----------------------------------------
 
     divider_y = (
         y
         + int(ROW_HEIGHT)
-        - 2
+        - 3
     )
 
     draw.line(
         [
-            (50, divider_y),
-            (1150, divider_y)
+            (145, divider_y),
+            (1140, divider_y)
         ],
-        fill="gray",
+        fill=LINE_COLOR,
         width=1
     )
 
 
 # =========================================================
-# FOOTER
+# FOOTER LINE
+# =========================================================
+
+draw.line(
+    [
+        (70, 705),
+        (1130, 705)
+    ],
+    fill=BLUE,
+    width=3
+)
+
+
+# =========================================================
+# FOOTER - VEENA NEWS
 # =========================================================
 
 footer_font = get_font(
     ENGLISH_BOLD,
-    16
+    25
 )
 
 draw.text(
-    (45, 690),
+    (70, 720),
     "Veena News",
-    fill="black",
+    fill=BLUE,
     font=footer_font
 )
 
 
 # =========================================================
-# SAVE
+# FOOTER HASHTAGS
+# =========================================================
+
+hashtag_font = get_font(
+    ENGLISH_BOLD,
+    19
+)
+
+hashtags = (
+    "#VeenaNews   "
+    "#HindiNews   "
+    "#News"
+)
+
+hashtag_box = draw.textbbox(
+    (0, 0),
+    hashtags,
+    font=hashtag_font
+)
+
+hashtag_width = (
+    hashtag_box[2]
+    - hashtag_box[0]
+)
+
+draw.text(
+    (
+        1130 - hashtag_width,
+        725
+    ),
+    hashtags,
+    fill=BLUE,
+    font=hashtag_font
+)
+
+
+# =========================================================
+# SAVE IMAGE
 # =========================================================
 
 canvas.save(
@@ -468,7 +721,7 @@ canvas.save(
 
 
 # =========================================================
-# RESULT
+# OUTPUT
 # =========================================================
 
 print(
