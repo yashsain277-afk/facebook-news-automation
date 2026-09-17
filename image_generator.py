@@ -13,30 +13,22 @@ draw = ImageDraw.Draw(image)
 
 # Fonts
 HINDI_BOLD = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
-HINDI_REGULAR = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
-
 ENGLISH_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-ENGLISH_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
-
-font_title = ImageFont.truetype(
-    HINDI_BOLD,
-    48
-)
 
 font_brand = ImageFont.truetype(
     ENGLISH_BOLD,
     32
 )
 
-font_footer_hindi = ImageFont.truetype(
-    HINDI_REGULAR,
-    28
+font_label = ImageFont.truetype(
+    ENGLISH_BOLD,
+    30
 )
 
-font_footer_english = ImageFont.truetype(
-    ENGLISH_REGULAR,
-    28
+font_title = ImageFont.truetype(
+    HINDI_BOLD,
+    48
 )
 
 
@@ -51,6 +43,24 @@ draw.text(
     "VEENA NEWS",
     fill="white",
     font=font_brand
+)
+
+
+# BREAKING NEWS
+draw.text(
+    (60, 135),
+    "BREAKING NEWS",
+    fill="black",
+    font=font_label
+)
+
+
+# HEADLINES
+draw.text(
+    (60, 180),
+    "HEADLINES",
+    fill="black",
+    font=font_label
 )
 
 
@@ -94,8 +104,8 @@ if current_line:
 lines = lines[:5]
 
 
-# Draw headline
-y = 175
+# Main headline
+y = 250
 
 for line in lines:
 
@@ -106,23 +116,7 @@ for line in lines:
         font=font_title
     )
 
-    y += 72
-
-
-# Footer
-draw.text(
-    (60, 555),
-    "ताज़ा खबर",
-    fill="black",
-    font=font_footer_hindi
-)
-
-draw.text(
-    (220, 555),
-    "• Veena News",
-    fill="black",
-    font=font_footer_english
-)
+    y += 70
 
 
 # Save image
@@ -131,4 +125,4 @@ image.save(
     quality=95
 )
 
-print("Hindi news image created successfully.")
+print("Breaking News headline image created successfully.")
