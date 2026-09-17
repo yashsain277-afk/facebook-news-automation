@@ -1,6 +1,11 @@
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 import sys
 import os
+
+
+# ==========================================
+# INPUT
+# ==========================================
 
 headlines_text = sys.argv[1]
 
@@ -11,9 +16,9 @@ headlines = [
 ][:10]
 
 
-# ==============================
-# VEENA NEWS BACKGROUND
-# ==============================
+# ==========================================
+# FILES
+# ==========================================
 
 BACKGROUND = "veena news background.jpg"
 
@@ -22,34 +27,32 @@ if not os.path.exists(BACKGROUND):
         f"Background image not found: {BACKGROUND}"
     )
 
-background = Image.open(BACKGROUND).convert("RGB")
 
-# Background का पूरा design सुरक्षित रखते हुए resize
+# ==========================================
+# CANVAS
+# ==========================================
+
 WIDTH = 1200
 HEIGHT = 800
 
-background.thumbnail(
+background = Image.open(BACKGROUND).convert("RGB")
+
+# Background को पूरा canvas cover करवाएं
+background = ImageOps.fit(
+    background,
     (WIDTH, HEIGHT),
-    Image.Resampling.LANCZOS
+    method=Image.Resampling.LANCZOS,
+    centering=(0.5, 0.5)
 )
 
-canvas = Image.new(
-    "RGB",
-    (WIDTH, HEIGHT),
-    "white"
-)
-
-x = (WIDTH - background.width) // 2
-y = (HEIGHT - background.height) // 2
-
-canvas.paste(background, (x, y))
+canvas = background.copy()
 
 draw = ImageDraw.Draw(canvas)
 
 
-# ==============================
+# ==========================================
 # FONTS
-# ==============================
+# ==========================================
 
 HINDI_BOLD = (
     "/usr/share/fonts/truetype/noto/"
@@ -66,77 +69,181 @@ ENGLISH_BOLD = (
     "DejaVuSans-Bold.ttf"
 )
 
-font_title = ImageFont.truetype(
-    HINDI_BOLD,
-    28
-)
 
-font_headline = ImageFont.truetype(
-    HINDI_REGULAR,
-    21
-)
+# ==========================================
+# FONT FUNCTION
+# ==========================================
 
-font_number = ImageFont.truetype(
-    ENGLISH_BOLD,
-    20
-)
+def get_font(path, size):
+    return ImageFont.truetype(path, size)
 
 
-# ==============================
+# ==========================================
+# HEADLINE FIT FUNCTION
+# ==========================================
+
+def fit_headline(text, max_width):
+    """
+    Headline को available width में fit करता है।
+    Font size automatically कम होगा।
+    """
+
+    max_size = 22
+    min_size = 14
+
+    for size in range(max_size, min_size - 1, -1):
+
+        font = get_font(
+            HINDI_REGULAR,
+            size
+        )
+
+        bbox = draw.textbbox(
+            (0, 0),
+            text,
+            font=font
+        )
+
+        text_width = bbox[2] - bbox[0]
+
+        if text_width <= max_width:
+            return text, font
+
+    # अगर फिर भी बहुत लंबी है
+    font = get_font(
+        HINDI_REGULAR,
+        min_size
+    )
+
+    shortened = text
+
+    while len(shortened) > 10:
+
+        bbox = draw.textbbox(
+            (0, 0),
+            shortened + "...",
+            font=font
+        )
+
+        text_width = bbox[2] - bbox[0]
+
+        if text_width <= max_width:
+            return shortened + "...", font
+
+        shortened = shortened[:-1]
+
+    return shortened + "...", font
+
+
+# ==========================================
 # TITLE
-# ==============================
+# ==========================================
+
+title_font = get_font(
+    HINDI_BOLD,
+    27
+)
 
 draw.text(
-    (95, 265),
+    (70, 270),
     "आज की 10 बड़ी खबरें",
     fill="black",
-    font=font_title
+    font=title_font
 )
 
 
-# ==============================
-# HEADLINES
-# ==============================
+# ==========================================
+# HEADLINES AREA
+# ==========================================
 
-start_y = 315
-line_height = 42
+START_Y = 315
+
+NUMBER_X = 55
+TEXT_X = 105
+
+MAX_TEXT_WIDTH = 1030
+
+LINE_HEIGHT = 32
+
+
+# ==========================================
+# DRAW 10 HEADLINES
+# ==========================================
 
 for index, headline in enumerate(
     headlines,
     start=1
 ):
 
-    # ज्यादा लंबी headline को छोटा करें
-    if len(headline) > 82:
-        headline = headline[:79] + "..."
-
-    number = f"{index}."
-
-    draw.text(
-        (65, start_y),
-        number,
-        fill="black",
-        font=font_number
+    # Headline को available width में fit करें
+    headline, headline_font = fit_headline(
+        headline,
+        MAX_TEXT_WIDTH
     )
 
+    number_font = get_font(
+        ENGLISH_BOLD,
+        17
+    )
+
+    # Number
     draw.text(
-        (105, start_y),
+        (NUMBER_X, START_Y),
+        f"{index}.",
+        fill="black",
+        font=number_font
+    )
+
+    # Headline
+    draw.text(
+        (TEXT_X, START_Y),
         headline,
         fill="black",
-        font=font_headline
+        font=headline_font
     )
 
-    start_y += line_height
+    # Divider
+    divider_y = START_Y + 28
+
+    draw.line(
+        [
+            (50, divider_y),
+            (1150, divider_y)
+        ],
+        fill="gray",
+        width=1
+    )
+
+    START_Y += LINE_HEIGHT
 
 
-# ==============================
-# SAVE
-# ==============================
+# ==========================================
+# FOOTER
+# ==========================================
+
+footer_font = get_font(
+    ENGLISH_BOLD,
+    16
+)
+
+draw.text(
+    (45, 690),
+    "Veena News",
+    fill="black",
+    font=footer_font
+)
+
+
+# ==========================================
+# SAVE IMAGE
+# ==========================================
 
 canvas.save(
     "news_image.jpg",
-    quality=95
+    quality=95,
+    optimize=True
 )
+
 
 print(
     f"News image created with {len(headlines)} headlines."
