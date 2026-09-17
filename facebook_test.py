@@ -23,6 +23,10 @@ try:
 except Exception:
     posted_news = []
 
+# Only the most recent 20 posted links are used for duplicate protection.
+# This prevents old news from blocking today's fresh posts forever.
+recent_posted_news = posted_news[-20:]
+
 all_news = collect_all_news()
 unique_news = remove_duplicates(all_news)
 
@@ -43,7 +47,6 @@ for item in unique_news:
     filtered_news.append(item)
 
 sorted_news = sort_by_date(filtered_news)
-
 candidate_news = select_topics(sorted_news, count=20)
 selected_news = []
 
@@ -51,7 +54,7 @@ for item in candidate_news:
     normalized_title = normalize_title(item["title"])
     already_posted = False
 
-    for posted in posted_news:
+    for posted in recent_posted_news:
         if isinstance(posted, str):
             if posted == item["link"]:
                 already_posted = True
@@ -70,9 +73,8 @@ for item in candidate_news:
     if len(selected_news) >= 10:
         break
 
-# Duplicate protection is normal behaviour, not a workflow failure.
 if not selected_news:
-    print("\nकोई नई news नहीं मिली — duplicate protection के कारण आज post नहीं किया जाएगा।")
+    print("\nकोई नई news नहीं मिली — recent duplicate protection के कारण post नहीं किया जाएगा।")
     print("Workflow successfully finished without creating a duplicate post.")
     raise SystemExit(0)
 
@@ -149,8 +151,11 @@ for item in selected_news:
     if item["link"] not in posted_news:
         posted_news.append(item["link"])
 
+# Keep the history small and useful.
+posted_news = posted_news[-100:]
+
 with open(POSTED_FILE, "w", encoding="utf-8") as file:
     json.dump(posted_news, file, ensure_ascii=False, indent=2)
 
 print("\n10 news links saved.")
-print("Duplicate protection completed.")
+print("Recent duplicate protection completed.")
