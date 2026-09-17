@@ -2,6 +2,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 import sys
 import os
 import unicodedata
+import re
 
 
 # =========================================================
@@ -43,10 +44,6 @@ background = Image.open(
     BACKGROUND
 ).convert("RGB")
 
-
-# Background को पूरा canvas में fit करें
-# इससे logo वाला हिस्सा अनावश्यक रूप से crop नहीं होगा।
-
 background = ImageOps.contain(
     background,
     (WIDTH, HEIGHT),
@@ -71,24 +68,33 @@ draw = ImageDraw.Draw(canvas)
 
 
 # =========================================================
-# FONTS
+# FONT PATHS
 # =========================================================
 
-HINDI_BOLD = (
-    "/usr/share/fonts/truetype/noto/"
-    "NotoSansDevanagari-Bold.ttf"
-)
-
-HINDI_REGULAR = (
+HINDI_FONT_PATH = (
     "/usr/share/fonts/truetype/noto/"
     "NotoSansDevanagari-Regular.ttf"
 )
 
-ENGLISH_BOLD = (
+HINDI_BOLD_PATH = (
+    "/usr/share/fonts/truetype/noto/"
+    "NotoSansDevanagari-Bold.ttf"
+)
+
+ENGLISH_FONT_PATH = (
+    "/usr/share/fonts/truetype/dejavu/"
+    "DejaVuSans.ttf"
+)
+
+ENGLISH_BOLD_PATH = (
     "/usr/share/fonts/truetype/dejavu/"
     "DejaVuSans-Bold.ttf"
 )
 
+
+# =========================================================
+# FONT FUNCTION
+# =========================================================
 
 def get_font(path, size):
     return ImageFont.truetype(
@@ -102,6 +108,7 @@ def get_font(path, size):
 # =========================================================
 
 WHITE = (255, 255, 255)
+
 BLACK = (15, 20, 30)
 
 RED = (218, 20, 28)
@@ -112,7 +119,66 @@ LINE_COLOR = (205, 210, 218)
 
 
 # =========================================================
-# CLEAN TEXT
+# CHARACTER CHECK
+# =========================================================
+
+def is_hindi(char):
+
+    code = ord(char)
+
+    return (
+        0x0900 <= code <= 0x097F
+    )
+
+
+def is_english(char):
+
+    return (
+        "A" <= char <= "Z"
+        or
+        "a" <= char <= "z"
+    )
+
+
+def is_number(char):
+
+    return (
+        "0" <= char <= "9"
+    )
+
+
+def is_allowed_punctuation(char):
+
+    return char in (
+        " ",
+        ".",
+        ",",
+        "।",
+        "!",
+        "?",
+        ":",
+        ";",
+        "-",
+        "–",
+        "—",
+        "(",
+        ")",
+        "/",
+        "%",
+        "₹",
+        "'",
+        '"',
+        "+",
+        "&",
+        "@",
+        "#",
+        "'",
+        "*"
+    )
+
+
+# =========================================================
+# TEXT CLEANER
 # =========================================================
 
 def clean_headline(text):
@@ -122,64 +188,35 @@ def clean_headline(text):
         text
     )
 
-    output = []
+    cleaned = []
 
     for char in text:
 
-        code = ord(char)
-
-        # Hindi / Devanagari
-        if 0x0900 <= code <= 0x097F:
-            output.append(char)
-            continue
-
-        # English
         if (
-            65 <= code <= 90
-            or 97 <= code <= 122
+            is_hindi(char)
+            or
+            is_english(char)
+            or
+            is_number(char)
+            or
+            is_allowed_punctuation(char)
         ):
-            output.append(char)
-            continue
 
-        # Numbers
-        if 48 <= code <= 57:
-            output.append(char)
-            continue
+            cleaned.append(char)
 
-        # Common punctuation
-        if char in (
-            " ",
-            ".",
-            ",",
-            "।",
-            "!",
-            "?",
-            ":",
-            ";",
-            "-",
-            "–",
-            "—",
-            "(",
-            ")",
-            "/",
-            "%",
-            "₹",
-            "'",
-            '"',
-            "+",
-            "&",
-            "@"
-        ):
-            output.append(char)
-            continue
+        else:
 
-        # Unsupported character
-        output.append(" ")
+            # Unsupported character को हटाएँ
+            # ताकि □□□ दिखाई न दें
+            cleaned.append(" ")
 
-    result = "".join(output)
+    result = "".join(cleaned)
 
-    result = " ".join(
-        result.split()
+    # Multiple spaces हटाएँ
+    result = re.sub(
+        r"\s+",
+        " ",
+        result
     )
 
     return result.strip()
@@ -206,7 +243,7 @@ headlines = cleaned_headlines[:10]
 
 
 # =========================================================
-# MAIN WHITE NEWS PANEL
+# MAIN WHITE PANEL
 # =========================================================
 
 PANEL_LEFT = 30
@@ -235,7 +272,6 @@ BANNER_TOP = 155
 BANNER_RIGHT = 1010
 BANNER_BOTTOM = 255
 
-
 draw.rounded_rectangle(
     [
         BANNER_LEFT,
@@ -249,7 +285,7 @@ draw.rounded_rectangle(
 
 
 # =========================================================
-# BLUE LEFT ACCENT
+# LEFT BLUE ACCENT
 # =========================================================
 
 draw.polygon(
@@ -274,7 +310,7 @@ draw.polygon(
 
 
 # =========================================================
-# BLUE RIGHT ACCENT
+# RIGHT BLUE ACCENT
 # =========================================================
 
 draw.polygon(
@@ -303,7 +339,7 @@ draw.polygon(
 # =========================================================
 
 title_font = get_font(
-    HINDI_BOLD,
+    HINDI_BOLD_PATH,
     54
 )
 
@@ -369,33 +405,182 @@ ROW_HEIGHT = (
 
 
 # =========================================================
-# TEXT WIDTH
+# FONT SELECTION
 # =========================================================
 
-def text_width(
-    text,
-    current_font
+def get_character_font(
+    char,
+    size
 ):
 
-    box = draw.textbbox(
-        (0, 0),
-        text,
-        font=current_font
-    )
+    if is_hindi(char):
 
-    return (
-        box[2]
-        - box[0]
+        return get_font(
+            HINDI_FONT_PATH,
+            size
+        )
+
+    return get_font(
+        ENGLISH_FONT_PATH,
+        size
     )
 
 
 # =========================================================
-# WRAP TEXT
+# DRAW MIXED LANGUAGE TEXT
 # =========================================================
 
-def wrap_text(
+def draw_mixed_text(
+    xy,
     text,
-    current_font,
+    size,
+    fill
+):
+
+    x, y = xy
+
+    current_font_type = None
+
+    current_text = ""
+
+    current_x = x
+
+    for char in text:
+
+        if is_hindi(char):
+
+            font_type = "hindi"
+
+        else:
+
+            font_type = "english"
+
+        if (
+            current_font_type is not None
+            and
+            font_type != current_font_type
+        ):
+
+            if current_text:
+
+                if current_font_type == "hindi":
+
+                    current_font = get_font(
+                        HINDI_FONT_PATH,
+                        size
+                    )
+
+                else:
+
+                    current_font = get_font(
+                        ENGLISH_FONT_PATH,
+                        size
+                    )
+
+                draw.text(
+                    (
+                        current_x,
+                        y
+                    ),
+                    current_text,
+                    font=current_font,
+                    fill=fill
+                )
+
+                box = draw.textbbox(
+                    (
+                        current_x,
+                        y
+                    ),
+                    current_text,
+                    font=current_font
+                )
+
+                current_x = box[2]
+
+            current_text = ""
+
+        current_text += char
+
+        current_font_type = font_type
+
+
+    # आखिरी text
+    if current_text:
+
+        if current_font_type == "hindi":
+
+            current_font = get_font(
+                HINDI_FONT_PATH,
+                size
+            )
+
+        else:
+
+            current_font = get_font(
+                ENGLISH_FONT_PATH,
+                size
+            )
+
+        draw.text(
+            (
+                current_x,
+                y
+            ),
+            current_text,
+            font=current_font,
+            fill=fill
+        )
+
+
+# =========================================================
+# MEASURE MIXED TEXT
+# =========================================================
+
+def mixed_text_width(
+    text,
+    size
+):
+
+    width = 0
+
+    for char in text:
+
+        if is_hindi(char):
+
+            current_font = get_font(
+                HINDI_FONT_PATH,
+                size
+            )
+
+        else:
+
+            current_font = get_font(
+                ENGLISH_FONT_PATH,
+                size
+            )
+
+        box = draw.textbbox(
+            (0, 0),
+            char,
+            font=current_font
+        )
+
+        width += (
+            box[2]
+            - box[0]
+        )
+
+    return width
+
+
+# =========================================================
+# WRAP HEADLINE
+# =========================================================
+
+def wrap_headline(
+    text,
+    size,
     max_width
 ):
 
@@ -410,19 +595,24 @@ def wrap_text(
         test_line = (
             word
             if not current_line
-            else current_line + " " + word
+            else current_line
+            + " "
+            + word
         )
 
-        if text_width(
+        width = mixed_text_width(
             test_line,
-            current_font
-        ) <= max_width:
+            size
+        )
+
+        if width <= max_width:
 
             current_line = test_line
 
         else:
 
             if current_line:
+
                 lines.append(
                     current_line
                 )
@@ -430,6 +620,7 @@ def wrap_text(
             current_line = word
 
     if current_line:
+
         lines.append(
             current_line
         )
@@ -438,7 +629,7 @@ def wrap_text(
 
 
 # =========================================================
-# BEST FONT SIZE
+# FIT HEADLINE
 # =========================================================
 
 def fit_headline(text):
@@ -447,59 +638,54 @@ def fit_headline(text):
         TEXT_RIGHT - TEXT_X
     )
 
-    # बड़ा font पहले
+    # बड़े से छोटे font तक
     for size in (
-        25,
         24,
         23,
         22,
         21,
         20,
-        19
+        19,
+        18
     ):
 
-        current_font = get_font(
-            HINDI_REGULAR,
-            size
-        )
-
-        lines = wrap_text(
+        lines = wrap_headline(
             text,
-            current_font,
+            size,
             max_width
         )
 
-        if len(lines) <= 2:
-            return lines, current_font
+        if len(lines) <= 1:
+
+            return lines, size
+
+        if len(lines) == 2:
+
+            return lines, size
 
 
     # बहुत लंबी headline
-    current_font = get_font(
-        HINDI_REGULAR,
-        19
-    )
+    size = 18
 
-    lines = wrap_text(
+    lines = wrap_headline(
         text,
-        current_font,
+        size,
         max_width
     )
 
-
-    # Maximum 2 lines
     if len(lines) > 2:
 
         lines = lines[:2]
 
         last_line = lines[1]
 
-        # दूसरी line को width के अंदर रखें
         while (
-            text_width(
+            mixed_text_width(
                 last_line + "...",
-                current_font
+                size
             ) > max_width
-            and len(last_line) > 5
+            and
+            len(last_line) > 5
         ):
 
             last_line = last_line[:-1]
@@ -509,12 +695,11 @@ def fit_headline(text):
             + "..."
         )
 
-
-    return lines, current_font
+    return lines, size
 
 
 # =========================================================
-# DRAW HEADLINES
+# DRAW 10 HEADLINES
 # =========================================================
 
 for index, headline in enumerate(
@@ -522,19 +707,15 @@ for index, headline in enumerate(
     start=1
 ):
 
-    # -----------------------------------------
-    # Row position
-    # -----------------------------------------
-
     y = START_Y + int(
         (index - 1)
         * ROW_HEIGHT
     )
 
 
-    # -----------------------------------------
+    # =====================================================
     # RED NUMBER CIRCLE
-    # -----------------------------------------
+    # =====================================================
 
     radius = 23
 
@@ -555,12 +736,12 @@ for index, headline in enumerate(
     )
 
 
-    # -----------------------------------------
+    # =====================================================
     # NUMBER
-    # -----------------------------------------
+    # =====================================================
 
     number_font = get_font(
-        ENGLISH_BOLD,
+        ENGLISH_BOLD_PATH,
         23
     )
 
@@ -596,11 +777,11 @@ for index, headline in enumerate(
     )
 
 
-    # -----------------------------------------
+    # =====================================================
     # HEADLINE
-    # -----------------------------------------
+    # =====================================================
 
-    lines, headline_font = fit_headline(
+    lines, font_size = fit_headline(
         headline
     )
 
@@ -608,22 +789,24 @@ for index, headline in enumerate(
 
     for line in lines:
 
-        draw.text(
+        draw_mixed_text(
             (
                 TEXT_X,
                 line_y
             ),
             line,
-            fill=BLACK,
-            font=headline_font
+            font_size,
+            BLACK
         )
 
-        line_y += 24
+        line_y += (
+            font_size + 4
+        )
 
 
-    # -----------------------------------------
+    # =====================================================
     # DIVIDER
-    # -----------------------------------------
+    # =====================================================
 
     divider_y = (
         y
@@ -656,11 +839,11 @@ draw.line(
 
 
 # =========================================================
-# FOOTER - VEENA NEWS
+# FOOTER
 # =========================================================
 
 footer_font = get_font(
-    ENGLISH_BOLD,
+    ENGLISH_BOLD_PATH,
     25
 )
 
@@ -673,11 +856,11 @@ draw.text(
 
 
 # =========================================================
-# FOOTER HASHTAGS
+# HASHTAGS
 # =========================================================
 
 hashtag_font = get_font(
-    ENGLISH_BOLD,
+    ENGLISH_BOLD_PATH,
     19
 )
 
@@ -710,7 +893,7 @@ draw.text(
 
 
 # =========================================================
-# SAVE IMAGE
+# SAVE
 # =========================================================
 
 canvas.save(
@@ -719,10 +902,6 @@ canvas.save(
     optimize=True
 )
 
-
-# =========================================================
-# OUTPUT
-# =========================================================
 
 print(
     "News image created with "
