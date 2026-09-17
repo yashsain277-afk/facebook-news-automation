@@ -1,5 +1,4 @@
 from PIL import Image, ImageDraw, ImageFont
-import textwrap
 import sys
 
 
@@ -8,17 +7,38 @@ headline = sys.argv[1]
 WIDTH = 1200
 HEIGHT = 630
 
-# Background
 image = Image.new("RGB", (WIDTH, HEIGHT), "white")
 draw = ImageDraw.Draw(image)
 
-# Hindi fonts
-FONT_BOLD = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
-FONT_REGULAR = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
 
-font_title = ImageFont.truetype(FONT_BOLD, 48)
-font_brand = ImageFont.truetype(FONT_BOLD, 32)
-font_footer = ImageFont.truetype(FONT_REGULAR, 28)
+# Fonts
+HINDI_BOLD = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
+HINDI_REGULAR = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
+
+ENGLISH_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+ENGLISH_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+
+font_title = ImageFont.truetype(
+    HINDI_BOLD,
+    48
+)
+
+font_brand = ImageFont.truetype(
+    ENGLISH_BOLD,
+    32
+)
+
+font_footer_hindi = ImageFont.truetype(
+    HINDI_REGULAR,
+    28
+)
+
+font_footer_english = ImageFont.truetype(
+    ENGLISH_REGULAR,
+    28
+)
+
 
 # Top header
 draw.rectangle(
@@ -32,6 +52,7 @@ draw.text(
     fill="white",
     font=font_brand
 )
+
 
 # Headline wrapping
 max_width = 1080
@@ -58,18 +79,22 @@ for word in words:
         current_line = test_line
 
     else:
+
         if current_line:
             lines.append(current_line)
 
         current_line = word
 
+
 if current_line:
     lines.append(current_line)
 
-# Limit to 5 lines
+
+# Maximum 5 lines
 lines = lines[:5]
 
-# Headline
+
+# Draw headline
 y = 175
 
 for line in lines:
@@ -83,15 +108,24 @@ for line in lines:
 
     y += 72
 
+
 # Footer
 draw.text(
     (60, 555),
-    "ताज़ा खबर • Veena News",
+    "ताज़ा खबर",
     fill="black",
-    font=font_footer
+    font=font_footer_hindi
 )
 
-# Save
+draw.text(
+    (220, 555),
+    "• Veena News",
+    fill="black",
+    font=font_footer_english
+)
+
+
+# Save image
 image.save(
     "news_image.jpg",
     quality=95
