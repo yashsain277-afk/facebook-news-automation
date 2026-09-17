@@ -2,127 +2,184 @@ from PIL import Image, ImageDraw, ImageFont
 import sys
 
 
-headline = sys.argv[1]
+# 10 headlines newline से आएंगी
+headlines_text = sys.argv[1]
+
+headlines = [
+    line.strip()
+    for line in headlines_text.split("\n")
+    if line.strip()
+]
+
+# Maximum 10 headlines
+headlines = headlines[:10]
+
 
 WIDTH = 1200
 HEIGHT = 630
 
-image = Image.new("RGB", (WIDTH, HEIGHT), "white")
+image = Image.new(
+    "RGB",
+    (WIDTH, HEIGHT),
+    "white"
+)
+
 draw = ImageDraw.Draw(image)
 
 
 # Fonts
-HINDI_BOLD = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
-ENGLISH_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+HINDI_BOLD = (
+    "/usr/share/fonts/truetype/noto/"
+    "NotoSansDevanagari-Bold.ttf"
+)
+
+ENGLISH_BOLD = (
+    "/usr/share/fonts/truetype/dejavu/"
+    "DejaVuSans-Bold.ttf"
+)
 
 
 font_brand = ImageFont.truetype(
     ENGLISH_BOLD,
-    32
+    30
 )
 
 font_label = ImageFont.truetype(
     ENGLISH_BOLD,
-    30
+    26
 )
 
-font_title = ImageFont.truetype(
+font_headline = ImageFont.truetype(
     HINDI_BOLD,
-    48
+    25
 )
 
 
-# Top header
+# =========================
+# TOP HEADER
+# =========================
+
 draw.rectangle(
-    [(0, 0), (WIDTH, 105)],
+    [(0, 0), (WIDTH, 85)],
     fill="black"
 )
 
 draw.text(
-    (55, 28),
+    (45, 24),
     "VEENA NEWS",
     fill="white",
     font=font_brand
 )
 
 
-# BREAKING NEWS
+# =========================
+# LABELS
+# =========================
+
 draw.text(
-    (60, 135),
+    (45, 105),
     "BREAKING NEWS",
     fill="black",
     font=font_label
 )
 
-
-# HEADLINES
 draw.text(
-    (60, 180),
+    (45, 140),
     "HEADLINES",
     fill="black",
     font=font_label
 )
 
 
-# Headline wrapping
-max_width = 1080
-words = headline.split()
+# =========================
+# HEADLINES
+# =========================
 
-lines = []
-current_line = ""
+start_y = 185
+line_height = 42
 
-for word in words:
+max_width = 1090
 
-    test_line = (
-        current_line + " " + word
-    ).strip()
 
+def fit_text(text, font, max_width):
+
+    # पहले पूरा text check करें
     bbox = draw.textbbox(
         (0, 0),
-        test_line,
-        font=font_title
+        text,
+        font=font
     )
 
-    line_width = bbox[2] - bbox[0]
+    width = bbox[2] - bbox[0]
 
-    if line_width <= max_width:
-        current_line = test_line
+    if width <= max_width:
+        return text
 
-    else:
+    # लंबी headline को छोटा करें
+    shortened = text
 
-        if current_line:
-            lines.append(current_line)
+    while len(shortened) > 10:
 
-        current_line = word
+        shortened = shortened[:-1]
+
+        test_text = shortened + "..."
+
+        bbox = draw.textbbox(
+            (0, 0),
+            test_text,
+            font=font
+        )
+
+        width = bbox[2] - bbox[0]
+
+        if width <= max_width:
+            return test_text
+
+    return shortened + "..."
 
 
-if current_line:
-    lines.append(current_line)
+for index, headline in enumerate(
+    headlines,
+    start=1
+):
 
+    number = f"{index}."
 
-# Maximum 5 lines
-lines = lines[:5]
+    # Number की जगह
+    draw.text(
+        (45, start_y),
+        number,
+        fill="black",
+        font=font_headline
+    )
 
-
-# Main headline
-y = 250
-
-for line in lines:
+    # Headline
+    safe_headline = fit_text(
+        headline,
+        font_headline,
+        max_width - 75
+    )
 
     draw.text(
-        (60, y),
-        line,
+        (85, start_y),
+        safe_headline,
         fill="black",
-        font=font_title
+        font=font_headline
     )
 
-    y += 70
+    start_y += line_height
 
 
-# Save image
+# =========================
+# SAVE
+# =========================
+
 image.save(
     "news_image.jpg",
     quality=95
 )
 
-print("Breaking News headline image created successfully.")
+print(
+    f"News image created with "
+    f"{len(headlines)} headlines."
+)
