@@ -23,9 +23,8 @@ try:
 except Exception:
     posted_news = []
 
-# Only the most recent 20 posted links are used for duplicate protection.
-# This prevents old news from blocking today's fresh posts forever.
-recent_posted_news = posted_news[-20:]
+# Only the most recent 10 posted items are protected first.
+recent_posted_news = posted_news[-10:]
 
 all_news = collect_all_news()
 unique_news = remove_duplicates(all_news)
@@ -48,8 +47,11 @@ for item in unique_news:
 
 sorted_news = sort_by_date(filtered_news)
 candidate_news = select_topics(sorted_news, count=20)
-selected_news = []
 
+selected_news = []
+selected_links = set()
+
+# First pass: avoid the most recently posted news.
 for item in candidate_news:
     normalized_title = normalize_title(item["title"])
     already_posted = False
@@ -69,17 +71,30 @@ for item in candidate_news:
 
     if not already_posted:
         selected_news.append(item)
+        selected_links.add(item["link"])
 
     if len(selected_news) >= 10:
         break
 
+# If fewer than 10 remain, fill from the latest available headlines.
+# This keeps the twice-daily post at exactly 10 headlines instead of producing
+# an empty/one-headline image when the RSS feeds overlap with recent posts.
+if len(selected_news) < 10:
+    for item in candidate_news:
+        if item["link"] in selected_links:
+            continue
+        selected_news.append(item)
+        selected_links.add(item["link"])
+        print(f"Filling headline slot from latest available news: {item['title']}")
+        if len(selected_news) >= 10:
+            break
+
 if not selected_news:
-    print("\nकोई नई news नहीं मिली — recent duplicate protection के कारण post नहीं किया जाएगा।")
-    print("Workflow successfully finished without creating a duplicate post.")
+    print("\nकोई news उपलब्ध नहीं है — आज post नहीं किया जाएगा।")
     raise SystemExit(0)
 
 print("\n===================================")
-print("       SELECTED 10 HEADLINES")
+print(f"       SELECTED {len(selected_news)} HEADLINES")
 print("===================================")
 
 for index, item in enumerate(selected_news, start=1):
@@ -89,7 +104,7 @@ for index, item in enumerate(selected_news, start=1):
 # Final template input: headline || source
 image_items = [
     f"{item['title']} || {item['source']}"
-    for item in selected_news
+    for item in selected_news[:10]
 ]
 image_input = "\n".join(image_items)
 
@@ -147,11 +162,10 @@ except Exception as e:
     print(e)
     raise
 
-for item in selected_news:
+for item in selected_news[:10]:
     if item["link"] not in posted_news:
         posted_news.append(item["link"])
 
-# Keep the history small and useful.
 posted_news = posted_news[-100:]
 
 with open(POSTED_FILE, "w", encoding="utf-8") as file:
