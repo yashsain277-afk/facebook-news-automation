@@ -25,7 +25,24 @@ except Exception:
 
 all_news = collect_all_news()
 unique_news = remove_duplicates(all_news)
-sorted_news = sort_by_date(unique_news)
+
+# Ignore social-media posts and obvious junk sources.
+filtered_news = []
+for item in unique_news:
+    source = str(item.get("source", "")).strip().lower()
+    title = str(item.get("title", "")).strip().lower()
+
+    if "facebook.com" in source or "facebook.com" in title:
+        print(f"Skipping Facebook source: {item.get('title', '')}")
+        continue
+
+    if "#newslive" in title or "#tatagroup" in title:
+        print(f"Skipping social-media style headline: {item.get('title', '')}")
+        continue
+
+    filtered_news.append(item)
+
+sorted_news = sort_by_date(filtered_news)
 
 candidate_news = select_topics(sorted_news, count=20)
 selected_news = []
@@ -53,8 +70,11 @@ for item in candidate_news:
     if len(selected_news) >= 10:
         break
 
+# Duplicate protection is normal behaviour, not a workflow failure.
 if not selected_news:
-    raise RuntimeError("कोई नई news नहीं मिली")
+    print("\nकोई नई news नहीं मिली — duplicate protection के कारण आज post नहीं किया जाएगा।")
+    print("Workflow successfully finished without creating a duplicate post.")
+    raise SystemExit(0)
 
 print("\n===================================")
 print("       SELECTED 10 HEADLINES")
