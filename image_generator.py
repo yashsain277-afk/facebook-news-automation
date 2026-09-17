@@ -1,5 +1,6 @@
 from PIL import Image, ImageDraw, ImageFont
 import sys
+import os
 
 headlines_text = sys.argv[1]
 
@@ -7,69 +8,136 @@ headlines = [
     line.strip()
     for line in headlines_text.split("\n")
     if line.strip()
-]
+][:10]
 
-headlines = headlines[:10]
 
+# ==============================
+# VEENA NEWS BACKGROUND
+# ==============================
+
+BACKGROUND = "veena news background.jpg"
+
+if not os.path.exists(BACKGROUND):
+    raise FileNotFoundError(
+        f"Background image not found: {BACKGROUND}"
+    )
+
+background = Image.open(BACKGROUND).convert("RGB")
+
+# Background का पूरा design सुरक्षित रखते हुए resize
 WIDTH = 1200
-HEIGHT = 630
+HEIGHT = 800
 
-image = Image.new("RGB", (WIDTH, HEIGHT), "white")
-draw = ImageDraw.Draw(image)
+background.thumbnail(
+    (WIDTH, HEIGHT),
+    Image.Resampling.LANCZOS
+)
 
-# Fonts
-HINDI_FONT = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
-HINDI_BOLD = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
-ENGLISH_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+canvas = Image.new(
+    "RGB",
+    (WIDTH, HEIGHT),
+    "white"
+)
 
-font_brand = ImageFont.truetype(ENGLISH_BOLD, 28)
-font_section = ImageFont.truetype(HINDI_BOLD, 25)
-font_headline = ImageFont.truetype(HINDI_FONT, 22)
+x = (WIDTH - background.width) // 2
+y = (HEIGHT - background.height) // 2
 
-# Header
-draw.rectangle([(0, 0), (WIDTH, 78)], fill="black")
-draw.text((40, 22), "VEENA NEWS", fill="white", font=font_brand)
+canvas.paste(background, (x, y))
 
-draw.text((40, 96), "आज की 10 बड़ी खबरें", fill="black", font=font_section)
+draw = ImageDraw.Draw(canvas)
 
-# Headline area
-start_y = 145
-line_height = 46
 
-def shorten_text(text, max_chars=85):
-    if len(text) <= max_chars:
-        return text
-    return text[:max_chars - 3] + "..."
+# ==============================
+# FONTS
+# ==============================
 
-for index, headline in enumerate(headlines, start=1):
+HINDI_BOLD = (
+    "/usr/share/fonts/truetype/noto/"
+    "NotoSansDevanagari-Bold.ttf"
+)
+
+HINDI_REGULAR = (
+    "/usr/share/fonts/truetype/noto/"
+    "NotoSansDevanagari-Regular.ttf"
+)
+
+ENGLISH_BOLD = (
+    "/usr/share/fonts/truetype/dejavu/"
+    "DejaVuSans-Bold.ttf"
+)
+
+font_title = ImageFont.truetype(
+    HINDI_BOLD,
+    28
+)
+
+font_headline = ImageFont.truetype(
+    HINDI_REGULAR,
+    21
+)
+
+font_number = ImageFont.truetype(
+    ENGLISH_BOLD,
+    20
+)
+
+
+# ==============================
+# TITLE
+# ==============================
+
+draw.text(
+    (95, 265),
+    "आज की 10 बड़ी खबरें",
+    fill="black",
+    font=font_title
+)
+
+
+# ==============================
+# HEADLINES
+# ==============================
+
+start_y = 315
+line_height = 42
+
+for index, headline in enumerate(
+    headlines,
+    start=1
+):
+
+    # ज्यादा लंबी headline को छोटा करें
+    if len(headline) > 82:
+        headline = headline[:79] + "..."
+
     number = f"{index}."
-    safe_headline = shorten_text(headline)
 
     draw.text(
-        (40, start_y),
+        (65, start_y),
         number,
         fill="black",
-        font=font_headline
+        font=font_number
     )
 
     draw.text(
-        (82, start_y),
-        safe_headline,
+        (105, start_y),
+        headline,
         fill="black",
         font=font_headline
     )
 
     start_y += line_height
 
-# Footer
-draw.line([(40, 602), (1160, 602)], fill="black", width=1)
-draw.text(
-    (40, 608),
-    "Veena News",
-    fill="black",
-    font=ImageFont.truetype(ENGLISH_BOLD, 16)
+
+# ==============================
+# SAVE
+# ==============================
+
+canvas.save(
+    "news_image.jpg",
+    quality=95
 )
 
-image.save("news_image.jpg", quality=95)
-
-print(f"News image created with {len(headlines)} headlines.")
+print(
+    f"News image created with {len(headlines)} headlines."
+)
