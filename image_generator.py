@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import sys
 import os
+import textwrap
 
 
 # ==========================================
@@ -17,7 +18,7 @@ headlines = [
 
 
 # ==========================================
-# FILES
+# BACKGROUND
 # ==========================================
 
 BACKGROUND = "veena news background.jpg"
@@ -37,7 +38,6 @@ HEIGHT = 800
 
 background = Image.open(BACKGROUND).convert("RGB")
 
-# Background को पूरा canvas cover करवाएं
 background = ImageOps.fit(
     background,
     (WIDTH, HEIGHT),
@@ -46,7 +46,6 @@ background = ImageOps.fit(
 )
 
 canvas = background.copy()
-
 draw = ImageDraw.Draw(canvas)
 
 
@@ -70,79 +69,15 @@ ENGLISH_BOLD = (
 )
 
 
-# ==========================================
-# FONT FUNCTION
-# ==========================================
-
-def get_font(path, size):
+def font(path, size):
     return ImageFont.truetype(path, size)
-
-
-# ==========================================
-# HEADLINE FIT FUNCTION
-# ==========================================
-
-def fit_headline(text, max_width):
-    """
-    Headline को available width में fit करता है।
-    Font size automatically कम होगा।
-    """
-
-    max_size = 22
-    min_size = 14
-
-    for size in range(max_size, min_size - 1, -1):
-
-        font = get_font(
-            HINDI_REGULAR,
-            size
-        )
-
-        bbox = draw.textbbox(
-            (0, 0),
-            text,
-            font=font
-        )
-
-        text_width = bbox[2] - bbox[0]
-
-        if text_width <= max_width:
-            return text, font
-
-    # अगर फिर भी बहुत लंबी है
-    font = get_font(
-        HINDI_REGULAR,
-        min_size
-    )
-
-    shortened = text
-
-    while len(shortened) > 10:
-
-        bbox = draw.textbbox(
-            (0, 0),
-            shortened + "...",
-            font=font
-        )
-
-        text_width = bbox[2] - bbox[0]
-
-        if text_width <= max_width:
-            return shortened + "...", font
-
-        shortened = shortened[:-1]
-
-    return shortened + "...", font
 
 
 # ==========================================
 # TITLE
 # ==========================================
 
-title_font = get_font(
-    HINDI_BOLD,
-    27
-)
+title_font = font(HINDI_BOLD, 28)
 
 draw.text(
     (70, 270),
@@ -153,21 +88,78 @@ draw.text(
 
 
 # ==========================================
-# HEADLINES AREA
+# HEADLINE SETTINGS
 # ==========================================
+
+NUMBER_X = 52
+TEXT_X = 100
+
+MAX_WIDTH = 1050
 
 START_Y = 315
 
-NUMBER_X = 55
-TEXT_X = 105
+# पूरे 10 headlines के लिए available height
+AVAILABLE_HEIGHT = 355
 
-MAX_TEXT_WIDTH = 1030
-
-LINE_HEIGHT = 32
+# लगभग 35px प्रति headline
+ROW_HEIGHT = AVAILABLE_HEIGHT / 10
 
 
 # ==========================================
-# DRAW 10 HEADLINES
+# TEXT WIDTH
+# ==========================================
+
+def text_width(text, current_font):
+    box = draw.textbbox(
+        (0, 0),
+        text,
+        font=current_font
+    )
+    return box[2] - box[0]
+
+
+# ==========================================
+# WRAP HEADLINE
+# ==========================================
+
+def wrap_headline(text, font_size):
+
+    current_font = font(
+        HINDI_REGULAR,
+        font_size
+    )
+
+    words = text.split()
+
+    lines = []
+    current_line = ""
+
+    for word in words:
+
+        test_line = (
+            word
+            if not current_line
+            else current_line + " " + word
+        )
+
+        if text_width(test_line, current_font) <= MAX_WIDTH:
+            current_line = test_line
+
+        else:
+
+            if current_line:
+                lines.append(current_line)
+
+            current_line = word
+
+    if current_line:
+        lines.append(current_line)
+
+    return lines, current_font
+
+
+# ==========================================
+# DRAW HEADLINES
 # ==========================================
 
 for index, headline in enumerate(
@@ -175,35 +167,70 @@ for index, headline in enumerate(
     start=1
 ):
 
-    # Headline को available width में fit करें
-    headline, headline_font = fit_headline(
+    # पहले बड़ा font try करें
+    lines, headline_font = wrap_headline(
         headline,
-        MAX_TEXT_WIDTH
+        20
     )
 
-    number_font = get_font(
+    # अगर 2 lines से ज्यादा बन रही हैं,
+    # font छोटा करें
+    if len(lines) > 2:
+
+        lines, headline_font = wrap_headline(
+            headline,
+            18
+        )
+
+    if len(lines) > 2:
+
+        lines, headline_font = wrap_headline(
+            headline,
+            16
+        )
+
+    # maximum 2 lines
+    if len(lines) > 2:
+
+        lines = lines[:2]
+
+        # दूसरी line के अंत में ...
+        lines[1] = lines[1].rstrip() + "..."
+
+    # Row की position
+    y = START_Y + int(
+        (index - 1) * ROW_HEIGHT
+    )
+
+    # Number
+    number_font = font(
         ENGLISH_BOLD,
         17
     )
 
-    # Number
     draw.text(
-        (NUMBER_X, START_Y),
+        (NUMBER_X, y),
         f"{index}.",
         fill="black",
         font=number_font
     )
 
     # Headline
-    draw.text(
-        (TEXT_X, START_Y),
-        headline,
-        fill="black",
-        font=headline_font
-    )
+    line_y = y
+
+    for line in lines:
+
+        draw.text(
+            (TEXT_X, line_y),
+            line,
+            fill="black",
+            font=headline_font
+        )
+
+        line_y += 19
 
     # Divider
-    divider_y = START_Y + 28
+    divider_y = y + int(ROW_HEIGHT) - 2
 
     draw.line(
         [
@@ -214,14 +241,12 @@ for index, headline in enumerate(
         width=1
     )
 
-    START_Y += LINE_HEIGHT
-
 
 # ==========================================
 # FOOTER
 # ==========================================
 
-footer_font = get_font(
+footer_font = font(
     ENGLISH_BOLD,
     16
 )
@@ -235,7 +260,7 @@ draw.text(
 
 
 # ==========================================
-# SAVE IMAGE
+# SAVE
 # ==========================================
 
 canvas.save(
