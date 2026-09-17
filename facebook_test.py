@@ -23,13 +23,13 @@ try:
 except Exception:
     posted_news = []
 
-# Only the most recent 10 posted items are protected first.
+# Protect only the most recent posts from immediate repetition.
 recent_posted_news = posted_news[-10:]
 
 all_news = collect_all_news()
 unique_news = remove_duplicates(all_news)
 
-# Ignore social-media posts and obvious junk sources.
+# Remove social-media/junk sources before selecting headlines.
 filtered_news = []
 for item in unique_news:
     source = str(item.get("source", "")).strip().lower()
@@ -46,22 +46,23 @@ for item in unique_news:
     filtered_news.append(item)
 
 sorted_news = sort_by_date(filtered_news)
-candidate_news = select_topics(sorted_news, count=20)
+
+# Use the normal time-window selection for fresh news.
+window_news = select_topics(sorted_news, count=20)
 
 selected_news = []
 selected_links = set()
 
-# First pass: avoid the most recently posted news.
-for item in candidate_news:
+# Pass 1: choose fresh/window news that is not among the 10 most recent posts.
+for item in window_news:
     normalized_title = normalize_title(item["title"])
     already_posted = False
 
     for posted in recent_posted_news:
-        if isinstance(posted, str):
-            if posted == item["link"]:
-                already_posted = True
-                break
-        elif isinstance(posted, dict):
+        if isinstance(posted, str) and posted == item["link"]:
+            already_posted = True
+            break
+        if isinstance(posted, dict):
             if posted.get("link") == item["link"]:
                 already_posted = True
                 break
@@ -76,11 +77,11 @@ for item in candidate_news:
     if len(selected_news) >= 10:
         break
 
-# If fewer than 10 remain, fill from the latest available headlines.
-# This keeps the twice-daily post at exactly 10 headlines instead of producing
-# an empty/one-headline image when the RSS feeds overlap with recent posts.
+# Pass 2: if the window overlaps with recent posts, fill from the latest
+# available filtered news. This guarantees a full 10-headline image whenever
+# at least 10 usable RSS headlines exist.
 if len(selected_news) < 10:
-    for item in candidate_news:
+    for item in sorted_news:
         if item["link"] in selected_links:
             continue
         selected_news.append(item)
@@ -90,8 +91,10 @@ if len(selected_news) < 10:
             break
 
 if not selected_news:
-    print("\nकोई news उपलब्ध नहीं है — आज post नहीं किया जाएगा।")
+    print("\nकोई usable news उपलब्ध नहीं है — आज post नहीं किया जाएगा।")
     raise SystemExit(0)
+
+selected_news = selected_news[:10]
 
 print("\n===================================")
 print(f"       SELECTED {len(selected_news)} HEADLINES")
@@ -104,7 +107,7 @@ for index, item in enumerate(selected_news, start=1):
 # Final template input: headline || source
 image_items = [
     f"{item['title']} || {item['source']}"
-    for item in selected_news[:10]
+    for item in selected_news
 ]
 image_input = "\n".join(image_items)
 
@@ -162,7 +165,7 @@ except Exception as e:
     print(e)
     raise
 
-for item in selected_news[:10]:
+for item in selected_news:
     if item["link"] not in posted_news:
         posted_news.append(item["link"])
 
