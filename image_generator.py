@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import sys
 import os
+import unicodedata
 
 
 # ==========================================
@@ -9,7 +10,7 @@ import os
 
 headlines_text = sys.argv[1]
 
-headlines = [
+raw_headlines = [
     line.strip()
     for line in headlines_text.split("\n")
     if line.strip()
@@ -47,7 +48,6 @@ background = ImageOps.fit(
 )
 
 canvas = background.copy()
-
 draw = ImageDraw.Draw(canvas)
 
 
@@ -72,24 +72,14 @@ ENGLISH_BOLD = (
 
 
 def font(path, size):
-    return ImageFont.truetype(
-        path,
-        size
-    )
+    return ImageFont.truetype(path, size)
 
 
 # ==========================================
-# CLEAN HEADLINE
+# CLEAN UNICODE
 # ==========================================
 
 def clean_headline(text):
-    """
-    Unsupported / strange Unicode characters
-    को हटाता है।
-
-    Hindi, English, numbers और सामान्य
-    punctuation को रखा जाता है।
-    """
 
     result = []
 
@@ -100,44 +90,55 @@ def clean_headline(text):
         # Hindi / Devanagari
         if 0x0900 <= code <= 0x097F:
             result.append(char)
+            continue
 
-        # Devanagari Extended
-        elif 0xA8E0 <= code <= 0xA8FF:
+        # English uppercase/lowercase
+        if (
+            "A" <= char <= "Z"
+            or "a" <= char <= "z"
+        ):
             result.append(char)
+            continue
 
-        # English / numbers / normal ASCII
-        elif 0x20 <= code <= 0x7E:
+        # Numbers
+        if "0" <= char <= "9":
             result.append(char)
+            continue
 
-        # सामान्य punctuation
-        elif char in (
-            "।",
+        # Space
+        if char == " ":
+            result.append(char)
+            continue
+
+        # Useful punctuation
+        if char in (
+            ".",
             ",",
+            "।",
             "!",
             "?",
+            ":",
+            ";",
             "-",
             "–",
             "—",
-            ":",
-            ";",
-            "%",
             "(",
             ")",
             "/",
+            "%",
+            "₹",
             "'",
             '"',
-            "₹",
-            ".",
         ):
             result.append(char)
+            continue
 
-        else:
-            # Unsupported character हटाएं
-            result.append(" ")
+        # बाकी सभी Unicode characters हटाएं
+        result.append(" ")
 
     cleaned = "".join(result)
 
-    # Extra spaces हटाएं
+    # Multiple spaces को एक space करें
     cleaned = " ".join(
         cleaned.split()
     )
@@ -149,17 +150,18 @@ def clean_headline(text):
 # CLEAN ALL HEADLINES
 # ==========================================
 
-headlines = [
-    clean_headline(headline)
-    for headline in headlines
-]
+headlines = []
 
-# Empty headlines हटाएं
-headlines = [
-    headline
-    for headline in headlines
-    if headline
-][:10]
+for headline in raw_headlines:
+
+    cleaned = clean_headline(
+        headline
+    )
+
+    if cleaned:
+        headlines.append(cleaned)
+
+headlines = headlines[:10]
 
 
 # ==========================================
@@ -184,18 +186,14 @@ draw.text(
 # ==========================================
 
 NUMBER_X = 52
-
 TEXT_X = 100
 
-# Number के बाद available width
 MAX_WIDTH = 1030
 
 START_Y = 315
 
-# Headlines के लिए कुल height
 AVAILABLE_HEIGHT = 355
 
-# 10 headlines
 ROW_HEIGHT = AVAILABLE_HEIGHT / 10
 
 
@@ -234,7 +232,6 @@ def wrap_headline(
     words = text.split()
 
     lines = []
-
     current_line = ""
 
     for word in words:
@@ -278,15 +275,13 @@ for index, headline in enumerate(
     start=1
 ):
 
-    # --------------------------------------
-    # Font size automatically select करें
-    # --------------------------------------
-
+    # पहले 20px
     lines, headline_font = wrap_headline(
         headline,
         20
     )
 
+    # बहुत लंबी हो तो 18px
     if len(lines) > 2:
 
         lines, headline_font = wrap_headline(
@@ -294,6 +289,7 @@ for index, headline in enumerate(
             18
         )
 
+    # फिर 16px
     if len(lines) > 2:
 
         lines, headline_font = wrap_headline(
@@ -311,7 +307,6 @@ for index, headline in enumerate(
 
         last_line = lines[1]
 
-        # दूसरी line को width के अंदर रखें
         while (
             text_width(
                 last_line + "...",
@@ -319,7 +314,6 @@ for index, headline in enumerate(
             ) > MAX_WIDTH
             and len(last_line) > 5
         ):
-
             last_line = last_line[:-1]
 
         lines[1] = (
@@ -413,7 +407,7 @@ draw.text(
 
 
 # ==========================================
-# SAVE IMAGE
+# SAVE
 # ==========================================
 
 canvas.save(
@@ -422,10 +416,6 @@ canvas.save(
     optimize=True
 )
 
-
-# ==========================================
-# RESULT
-# ==========================================
 
 print(
     f"News image created with "
