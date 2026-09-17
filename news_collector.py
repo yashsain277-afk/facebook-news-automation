@@ -1,357 +1,263 @@
-import urllib.request
-import urllib.parse
-import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta, timezone
+import feedparser
 import re
+from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 
 
 # =========================================================
-# GOOGLE NEWS RSS FEEDS
+# SETTINGS
 # =========================================================
 
-BASE_URL = "https://news.google.com/rss/search?"
-
-FEEDS = [
-    # India
-    {
-        "name": "India",
-        "url": BASE_URL + urllib.parse.urlencode({
-            "q": "India",
-            "hl": "hi",
-            "gl": "IN",
-            "ceid": "IN:hi",
-        }),
-    },
-
-    # Rajasthan
-    {
-        "name": "Rajasthan",
-        "url": BASE_URL + urllib.parse.urlencode({
-            "q": "Rajasthan",
-            "hl": "hi",
-            "gl": "IN",
-            "ceid": "IN:hi",
-        }),
-    },
-
-    # Kota
-    {
-        "name": "Kota",
-        "url": BASE_URL + urllib.parse.urlencode({
-            "q": "Kota Rajasthan",
-            "hl": "hi",
-            "gl": "IN",
-            "ceid": "IN:hi",
-        }),
-    },
-
-    # National politics / government
-    {
-        "name": "Politics",
-        "url": BASE_URL + urllib.parse.urlencode({
-            "q": "India politics government",
-            "hl": "hi",
-            "gl": "IN",
-            "ceid": "IN:hi",
-        }),
-    },
-
-    # Technology
-    {
-        "name": "Technology",
-        "url": BASE_URL + urllib.parse.urlencode({
-            "q": "technology India",
-            "hl": "hi",
-            "gl": "IN",
-            "ceid": "IN:hi",
-        }),
-    },
-
-    # Business
-    {
-        "name": "Business",
-        "url": BASE_URL + urllib.parse.urlencode({
-            "q": "India business economy",
-            "hl": "hi",
-            "gl": "IN",
-            "ceid": "IN:hi",
-        }),
-    },
-
-    # Sports
-    {
-        "name": "Sports",
-        "url": BASE_URL + urllib.parse.urlencode({
-            "q": "India sports",
-            "hl": "hi",
-            "gl": "IN",
-            "ceid": "IN:hi",
-        }),
-    },
-
-    # Entertainment
-    {
-        "name": "Entertainment",
-        "url": BASE_URL + urllib.parse.urlencode({
-            "q": "Bollywood entertainment India",
-            "hl": "hi",
-            "gl": "IN",
-            "ceid": "IN:hi",
-        }),
-    },
-]
+MAX_NEWS_PER_FEED = 5
+MAX_CANDIDATES = 20
 
 
 # =========================================================
-# TIMEZONE
+# NEWS FEEDS
 # =========================================================
 
-IST = timezone(timedelta(hours=5, minutes=30))
+FEEDS = {
+    "India": (
+        "https://news.google.com/rss/search?"
+        "q=India&hl=hi&gl=IN&ceid=IN:hi"
+    ),
+
+    "Rajasthan": (
+        "https://news.google.com/rss/search?"
+        "q=Rajasthan&hl=hi&gl=IN&ceid=IN:hi"
+    ),
+
+    "Kota": (
+        "https://news.google.com/rss/search?"
+        "q=Kota+Rajasthan&hl=hi&gl=IN&ceid=IN:hi"
+    ),
+
+    "Politics": (
+        "https://news.google.com/rss/search?"
+        "q=India+Politics&hl=hi&gl=IN&ceid=IN:hi"
+    ),
+
+    "Technology": (
+        "https://news.google.com/rss/search?"
+        "q=Technology+India&hl=hi&gl=IN&ceid=IN:hi"
+    ),
+
+    "Business": (
+        "https://news.google.com/rss/search?"
+        "q=Business+India&hl=hi&gl=IN&ceid=IN:hi"
+    ),
+
+    "Sports": (
+        "https://news.google.com/rss/search?"
+        "q=Sports+India&hl=hi&gl=IN&ceid=IN:hi"
+    ),
+
+    "Entertainment": (
+        "https://news.google.com/rss/search?"
+        "q=Bollywood+India&hl=hi&gl=IN&ceid=IN:hi"
+    ),
+}
 
 
 # =========================================================
-# TEXT CLEANING
+# TITLE NORMALIZATION
 # =========================================================
-
-def clean_text(text):
-    if not text:
-        return ""
-
-    text = re.sub(r"\s+", " ", text)
-    text = text.strip()
-
-    return text
-
 
 def normalize_title(title):
-    """
-    Duplicate detection के लिए headline normalize करता है.
-    """
 
-    title = clean_text(title)
+    title = str(title)
 
-    # Google News में कभी-कभी source title के बाद आता है
-    title = re.sub(
-        r"\s*[-|–—]\s*[^-|–—]+$",
-        "",
-        title
-    )
-
-    title = title.lower()
-
-    # punctuation हटाएं
-    title = re.sub(
-        r"[^\w\s\u0900-\u097F]",
-        " ",
-        title
-    )
-
+    # Extra spaces
     title = re.sub(
         r"\s+",
         " ",
         title
     )
 
-    return title.strip()
+    # Google News कभी source को title के अंत में जोड़ता है
+    title = re.sub(
+        r"\s+-\s+[^-]+$",
+        "",
+        title
+    )
+
+    return title.strip().lower()
 
 
 # =========================================================
-# DATE PARSER
+# CLEAN TITLE
 # =========================================================
 
-def parse_date(date_text):
-    """
-    RSS pubDate को datetime में बदलता है.
-    """
+def clean_title(title):
 
-    if not date_text:
-        return datetime.now(IST)
+    title = str(title)
 
-    # RSS date formats
-    formats = [
-        "%a, %d %b %Y %H:%M:%S %z",
-        "%a, %d %b %Y %H:%M %z",
-        "%d %b %Y %H:%M:%S %z",
-        "%d %b %Y %H:%M %z",
-    ]
+    # Extra spaces
+    title = re.sub(
+        r"\s+",
+        " ",
+        title
+    )
 
-    for fmt in formats:
-        try:
-            dt = datetime.strptime(
-                date_text,
-                fmt
+    title = title.strip()
+
+    return title
+
+
+# =========================================================
+# GET SOURCE
+# =========================================================
+
+def get_source(entry):
+
+    source = ""
+
+    try:
+        if entry.get("source"):
+            source = entry.source.get(
+                "title",
+                ""
             )
+    except Exception:
+        pass
 
-            return dt.astimezone(IST)
+    if not source:
+        title = entry.get(
+            "title",
+            ""
+        )
 
-        except Exception:
-            continue
-
-    return datetime.now(IST)
-
-
-# =========================================================
-# SOURCE EXTRACTION
-# =========================================================
-
-def extract_source(title, source_element=None):
-    """
-    Google News title से source निकालने की कोशिश.
-    """
-
-    if source_element is not None:
-
-        source_name = source_element.text
-
-        if source_name:
-            return clean_text(source_name)
-
-    # fallback
-    separators = [
-        " - ",
-        " | ",
-        " – ",
-        " — ",
-    ]
-
-    for separator in separators:
-
-        if separator in title:
+        # Google News title:
+        # Headline - Source
+        if " - " in title:
 
             parts = title.rsplit(
-                separator,
+                " - ",
                 1
             )
 
             if len(parts) == 2:
+                source = parts[1].strip()
 
-                possible_source = clean_text(
-                    parts[1]
-                )
-
-                if 2 <= len(possible_source) <= 80:
-                    return possible_source
-
-    return "Google News"
+    return source or "Google News"
 
 
 # =========================================================
-# FETCH RSS
+# GET PUBLISHED TIME
 # =========================================================
 
-def fetch_feed(feed):
-    """
-    एक RSS feed fetch करता है.
-    """
-
-    results = []
+def get_published_time(entry):
 
     try:
 
-        request = urllib.request.Request(
-            feed["url"],
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 "
-                    "VeenaNewsBot/1.0"
-                )
-            }
+        if entry.get("published_parsed"):
+
+            return datetime(
+                *entry.published_parsed[:6],
+                tzinfo=timezone.utc
+            )
+
+    except Exception:
+        pass
+
+    try:
+
+        if entry.get("updated_parsed"):
+
+            return datetime(
+                *entry.updated_parsed[:6],
+                tzinfo=timezone.utc
+            )
+
+    except Exception:
+        pass
+
+    return datetime.now(
+        timezone.utc
+    )
+
+
+# =========================================================
+# GET NEWS FROM ONE FEED
+# =========================================================
+
+def get_news(
+    category,
+    feed_url
+):
+
+    news_items = []
+
+    try:
+
+        feed = feedparser.parse(
+            feed_url
         )
-
-        with urllib.request.urlopen(
-            request,
-            timeout=20
-        ) as response:
-
-            data = response.read()
-
-        root = ET.fromstring(data)
-
-        channel = root.find("channel")
-
-        if channel is None:
-            return results
-
-        items = channel.findall("item")
-
-        for item in items[:25]:
-
-            title_element = item.find("title")
-            link_element = item.find("link")
-            date_element = item.find("pubDate")
-            source_element = item.find(
-                "{http://search.yahoo.com/mrss/}source"
-            )
-
-            if title_element is None:
-                continue
-
-            title = clean_text(
-                title_element.text or ""
-            )
-
-            link = ""
-
-            if link_element is not None:
-                link = clean_text(
-                    link_element.text or ""
-                )
-
-            if not title:
-                continue
-
-            published_text = ""
-
-            if date_element is not None:
-                published_text = (
-                    date_element.text or ""
-                )
-
-            published = parse_date(
-                published_text
-            )
-
-            source = extract_source(
-                title,
-                source_element
-            )
-
-            # Source suffix हटाकर clean headline
-            clean_title = title
-
-            if source:
-                suffix = (
-                    " - " + source
-                )
-
-                if clean_title.endswith(
-                    suffix
-                ):
-                    clean_title = clean_title[
-                        :-len(suffix)
-                    ]
-
-            clean_title = clean_text(
-                clean_title
-            )
-
-            results.append({
-                "title": clean_title,
-                "link": link,
-                "source": source,
-                "published": published,
-                "category": feed["name"],
-            })
 
     except Exception as error:
 
         print(
-            f"Feed failed: {feed['name']} "
-            f"-> {error}"
+            f"Feed error [{category}]: "
+            f"{error}"
         )
 
-    return results
+        return news_items
+
+
+    entries = feed.entries[
+        :MAX_NEWS_PER_FEED
+    ]
+
+
+    for entry in entries:
+
+        raw_title = entry.get(
+            "title",
+            ""
+        )
+
+        link = entry.get(
+            "link",
+            ""
+        )
+
+        if not raw_title or not link:
+            continue
+
+
+        title = clean_title(
+            raw_title
+        )
+
+
+        # Google News source
+        source = get_source(
+            entry
+        )
+
+
+        published = get_published_time(
+            entry
+        )
+
+
+        news_items.append(
+            {
+                "title": title,
+                "link": link,
+                "source": source,
+                "category": category,
+                "published": published,
+            }
+        )
+
+
+    print(
+        f"{category}: "
+        f"{len(news_items)} news"
+    )
+
+    return news_items
 
 
 # =========================================================
@@ -359,24 +265,25 @@ def fetch_feed(feed):
 # =========================================================
 
 def collect_all_news():
-    """
-    सभी RSS feeds से news collect करता है.
-    """
+
+    print(
+        "\nCollecting latest news..."
+    )
 
     all_news = []
 
-    print("\nCollecting news...\n")
 
-    for feed in FEEDS:
+    for category, feed_url in FEEDS.items():
 
-        items = fetch_feed(feed)
-
-        print(
-            f"{feed['name']}: "
-            f"{len(items)} news"
+        news = get_news(
+            category,
+            feed_url
         )
 
-        all_news.extend(items)
+        all_news.extend(
+            news
+        )
+
 
     print(
         f"\nTotal collected: "
@@ -387,25 +294,25 @@ def collect_all_news():
 
 
 # =========================================================
-# DUPLICATE REMOVAL
+# REMOVE DUPLICATES
 # =========================================================
 
-def remove_duplicates(news_items):
-    """
-    Same headline/link को हटाता है.
-    """
+def remove_duplicates(
+    news_items
+):
 
-    unique = []
+    unique_news = []
 
     seen_links = set()
     seen_titles = []
+
 
     for item in news_items:
 
         link = item.get(
             "link",
             ""
-        ).strip()
+        )
 
         title = normalize_title(
             item.get(
@@ -414,14 +321,13 @@ def remove_duplicates(news_items):
             )
         )
 
-        if not title:
+
+        # Same link
+        if link in seen_links:
             continue
 
-        # Exact link duplicate
-        if link and link in seen_links:
-            continue
 
-        # Similar title duplicate
+        # Same / almost same headline
         duplicate = False
 
         for old_title in seen_titles:
@@ -433,42 +339,50 @@ def remove_duplicates(news_items):
             ).ratio()
 
             if similarity >= 0.88:
+
                 duplicate = True
                 break
+
 
         if duplicate:
             continue
 
-        if link:
-            seen_links.add(link)
 
-        seen_titles.append(title)
+        seen_links.add(
+            link
+        )
 
-        unique.append(item)
+        seen_titles.append(
+            title
+        )
+
+        unique_news.append(
+            item
+        )
+
 
     print(
         f"After duplicate removal: "
-        f"{len(unique)}"
+        f"{len(unique_news)}"
     )
 
-    return unique
+    return unique_news
 
 
 # =========================================================
 # SORT BY DATE
 # =========================================================
 
-def sort_by_date(news_items):
-    """
-    Latest news पहले.
-    """
+def sort_by_date(
+    news_items
+):
 
     return sorted(
         news_items,
         key=lambda item: item.get(
             "published",
             datetime.min.replace(
-                tzinfo=IST
+                tzinfo=timezone.utc
             )
         ),
         reverse=True
@@ -480,27 +394,40 @@ def sort_by_date(news_items):
 # =========================================================
 
 def get_post_window():
-    """
-    Morning / Evening posting window.
-    """
 
-    now = datetime.now(IST)
+    india_timezone = timezone(
+        timedelta(
+            hours=5,
+            minutes=30
+        )
+    )
 
-    if 6 <= now.hour < 14:
+    now = datetime.now(
+        india_timezone
+    )
 
-        start = (
-            now.replace(
-                hour=6,
-                minute=0,
-                second=0,
-                microsecond=0
-            )
-            - timedelta(hours=12)
+    hour = now.hour
+
+
+    # Morning post
+    if 6 <= hour < 14:
+
+        window_name = "MORNING"
+
+        start = now.replace(
+            hour=18,
+            minute=0,
+            second=0,
+            microsecond=0
+        ) - timedelta(
+            days=1
         )
 
-        return start, now, "MORNING"
 
-    elif 14 <= now.hour <= 23:
+    # Evening post
+    elif 14 <= hour <= 23:
+
+        window_name = "EVENING"
 
         start = now.replace(
             hour=10,
@@ -509,93 +436,67 @@ def get_post_window():
             microsecond=0
         )
 
-        return start, now, "EVENING"
 
+    # Manual testing
     else:
+
+        window_name = "TEST"
 
         start = now - timedelta(
             hours=12
         )
 
-        return start, now, "NIGHT_TEST"
 
-
-# =========================================================
-# HEADLINE SIMILARITY
-# =========================================================
-
-def is_similar_to_selected(
-    title,
-    selected
-):
-    """
-    Selected headlines में बहुत similar headline
-    होने से रोकता है.
-    """
-
-    normalized = normalize_title(
-        title
+    print(
+        f"\nPost window: "
+        f"{window_name}"
     )
 
-    for item in selected:
-
-        old = normalize_title(
-            item["title"]
+    print(
+        "Window start:",
+        start.strftime(
+            "%Y-%m-%d %H:%M"
         )
+    )
 
-        similarity = SequenceMatcher(
-            None,
-            normalized,
-            old
-        ).ratio()
+    print(
+        "Window end:",
+        now.strftime(
+            "%Y-%m-%d %H:%M"
+        )
+    )
 
-        if similarity >= 0.72:
-            return True
-
-    return False
+    return (
+        start.astimezone(
+            timezone.utc
+        ),
+        now.astimezone(
+            timezone.utc
+        ),
+        window_name
+    )
 
 
 # =========================================================
-# SELECT TOPICS
+# SELECT LATEST NEWS
 # =========================================================
 
 def select_topics(
     news_items,
-    count=10
+    count=20
 ):
-    """
-    सबसे relevant और अलग-अलग headlines चुनता है.
-
-    पहले recent news,
-    फिर category diversity,
-    फिर similarity filtering.
-    """
 
     if not news_items:
         return []
 
-    now = datetime.now(IST)
 
-    window_start, window_end, window_name = (
+    start_utc, end_utc, window_name = (
         get_post_window()
     )
 
-    print(
-        f"\nPost window: {window_name}"
-    )
-
-    print(
-        f"Window start: "
-        f"{window_start.strftime('%Y-%m-%d %H:%M')}"
-    )
-
-    print(
-        f"Window end: "
-        f"{window_end.strftime('%Y-%m-%d %H:%M')}"
-    )
 
     # -----------------------------------------------------
-    # पहले 24 घंटे की fresh news
+    # पहले आज की / current window की news
     # -----------------------------------------------------
 
     fresh_news = []
@@ -609,209 +510,148 @@ def select_topics(
         if not published:
             continue
 
+
         if (
-            now - timedelta(hours=24)
+            start_utc
             <= published
-            <= now + timedelta(minutes=10)
+            <= end_utc
         ):
-            fresh_news.append(item)
+
+            fresh_news.append(
+                item
+            )
+
 
     print(
-        f"Fresh news (24h): "
+        f"Fresh news in window: "
         f"{len(fresh_news)}"
     )
 
-    # अगर fresh news पर्याप्त नहीं है
-    # तो सभी available news use करें
-    if len(fresh_news) < count:
-
-        fallback = [
-            item
-            for item in news_items
-            if item not in fresh_news
-        ]
-
-        candidates = (
-            fresh_news + fallback
-        )
-
-    else:
-
-        candidates = fresh_news
 
     # -----------------------------------------------------
-    # Score candidates
+    # अगर window में बहुत कम news मिले
+    # तो latest news से list पूरी करें
     # -----------------------------------------------------
 
-    scored = []
+    if len(fresh_news) < 10:
 
-    category_bonus = {
-        "India": 10,
-        "Rajasthan": 12,
-        "Kota": 14,
-        "Politics": 8,
-        "Technology": 7,
-        "Business": 7,
-        "Sports": 7,
-        "Entertainment": 5,
-    }
-
-    for item in candidates:
-
-        published = item.get(
-            "published",
-            now
+        print(
+            "Fresh news कम है, "
+            "latest news से list पूरी की जाएगी."
         )
 
-        age_hours = (
-            now - published
-        ).total_seconds() / 3600
+        fresh_links = {
+            item["link"]
+            for item in fresh_news
+        }
 
-        # Negative age को zero करें
-        age_hours = max(
-            0,
-            age_hours
-        )
 
-        # Recent news को ज्यादा score
-        recency_score = max(
-            0,
-            50 - age_hours * 2
-        )
+        for item in news_items:
 
-        category = item.get(
-            "category",
-            ""
-        )
+            if item["link"] not in fresh_links:
 
-        category_score = category_bonus.get(
-            category,
-            3
-        )
+                fresh_news.append(
+                    item
+                )
 
-        # Window में आने वाली news को bonus
-        window_score = 0
+                fresh_links.add(
+                    item["link"]
+                )
 
-        if (
-            window_start
-            <= published
-            <= window_end
-        ):
-            window_score = 20
 
-        total_score = (
-            recency_score
-            + category_score
-            + window_score
-        )
+            if len(fresh_news) >= count:
+                break
 
-        scored.append(
-            (
-                total_score,
-                item
-            )
-        )
 
-    scored.sort(
-        key=lambda x: x[0],
-        reverse=True
+    # -----------------------------------------------------
+    # Date के हिसाब से latest first
+    # -----------------------------------------------------
+
+    fresh_news = sort_by_date(
+        fresh_news
     )
 
+
     # -----------------------------------------------------
-    # Diverse selection
+    # Category diversity
+    #
+    # एक ही category की सारी headlines
+    # लगातार आने से रोकना
     # -----------------------------------------------------
 
     selected = []
 
-    category_counts = {}
+    category_count = {}
 
-    # पहले category diversity
-    for score, item in scored:
 
-        if len(selected) >= count:
-            break
+    # पहले हर category से limited news
+    for item in fresh_news:
 
         category = item.get(
             "category",
             "Other"
         )
 
-        # एक ही category की अधिकतम 3 news
-        if category_counts.get(
+        current_count = category_count.get(
             category,
             0
-        ) >= 3:
-            continue
-
-        title = item.get(
-            "title",
-            ""
         )
 
-        if not title:
+
+        if current_count >= 4:
             continue
 
-        if is_similar_to_selected(
-            title,
-            selected
-        ):
-            continue
 
-        selected.append(item)
-
-        category_counts[category] = (
-            category_counts.get(
-                category,
-                0
-            ) + 1
+        selected.append(
+            item
         )
+
+        category_count[
+            category
+        ] = current_count + 1
+
+
+        if len(selected) >= count:
+            break
+
 
     # -----------------------------------------------------
-    # अगर 10 नहीं हुए तो remaining candidates से भरें
+    # अगर count पूरा नहीं हुआ
+    # remaining latest news जोड़ें
     # -----------------------------------------------------
 
     if len(selected) < count:
 
-        for score, item in scored:
+        selected_links = {
+            item["link"]
+            for item in selected
+        }
+
+
+        for item in fresh_news:
+
+            if item["link"] in selected_links:
+                continue
+
+
+            selected.append(
+                item
+            )
+
+            selected_links.add(
+                item["link"]
+            )
+
 
             if len(selected) >= count:
                 break
 
-            title = item.get(
-                "title",
-                ""
-            )
-
-            if not title:
-                continue
-
-            if any(
-                item.get("link")
-                == old.get("link")
-                for old in selected
-            ):
-                continue
-
-            if is_similar_to_selected(
-                title,
-                selected
-            ):
-                continue
-
-            selected.append(item)
-
-    # -----------------------------------------------------
-    # Final sort: latest first
-    # -----------------------------------------------------
-
-    selected = sort_by_date(
-        selected
-    )
 
     print(
         f"\nSelected headlines: "
         f"{len(selected)}"
     )
+
 
     for index, item in enumerate(
         selected,
@@ -824,17 +664,17 @@ def select_topics(
             f"[{item['category']}]"
         )
 
-    return selected
+
+    return selected[:count]
 
 
 # =========================================================
 # COMPATIBILITY FUNCTION
 # =========================================================
 
-def select_topic(news_items):
-    """
-    पुराने code के लिए compatibility.
-    """
+def select_topic(
+    news_items
+):
 
     topics = select_topics(
         news_items,
@@ -848,7 +688,7 @@ def select_topic(news_items):
 
 
 # =========================================================
-# MAIN TEST
+# MAIN
 # =========================================================
 
 def main():
@@ -865,12 +705,22 @@ def main():
 
     selected = select_topics(
         sorted_news,
-        count=10
+        count=MAX_CANDIDATES
     )
 
-    print("\n===================================")
-    print("       FINAL 10 HEADLINES")
-    print("===================================\n")
+
+    print(
+        "\n==================================="
+    )
+
+    print(
+        "LATEST NEWS CANDIDATES"
+    )
+
+    print(
+        "==================================="
+    )
+
 
     for index, item in enumerate(
         selected,
@@ -878,12 +728,8 @@ def main():
     ):
 
         print(
-            f"{index}. {item['title']}"
-        )
-
-        print(
-            f"   Category: "
-            f"{item['category']}"
+            f"{index}. "
+            f"{item['title']}"
         )
 
         print(
@@ -891,7 +737,15 @@ def main():
             f"{item['source']}"
         )
 
-        print()
+        print(
+            f"   Category: "
+            f"{item['category']}"
+        )
+
+
+    print(
+        "\nNews collection completed."
+    )
 
 
 # =========================================================
