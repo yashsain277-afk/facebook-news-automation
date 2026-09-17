@@ -52,7 +52,7 @@ sorted_news = sort_by_date(
 # 10 headlines चुनें
 candidate_news = select_topics(
     sorted_news,
-    count=15
+    count=30
 )
 
 
