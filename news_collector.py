@@ -1,7 +1,8 @@
 import urllib.request
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 import re
 
 
@@ -12,6 +13,9 @@ FEEDS = {
 }
 
 
+INDIA_TZ = ZoneInfo("Asia/Kolkata")
+
+
 def normalize_title(title):
     title = title.lower()
     title = re.sub(r"[^\w\s]", " ", title)
@@ -19,10 +23,12 @@ def normalize_title(title):
     return title.strip()
 
 
-def get_news(feed_name, feed_url, limit=10):
+def get_news(feed_name, feed_url, limit=15):
+
     news_items = []
 
     try:
+
         request = urllib.request.Request(
             feed_url,
             headers={
@@ -30,10 +36,15 @@ def get_news(feed_name, feed_url, limit=10):
             }
         )
 
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urllib.request.urlopen(
+            request,
+            timeout=20
+        ) as response:
+
             data = response.read()
 
         root = ET.fromstring(data)
+
         items = root.findall(".//item")
 
         for item in items[:limit]:
@@ -53,17 +64,21 @@ def get_news(feed_name, feed_url, limit=10):
                 default=""
             ).strip()
 
-            # Google News title में अक्सर publisher का नाम
-            # आखिरी " - " के बाद आता है
             publisher = feed_name
 
+            # Google News title से publisher निकालें
             if " - " in title:
-                title_parts = title.rsplit(" - ", 1)
+
+                title_parts = title.rsplit(
+                    " - ",
+                    1
+                )
 
                 possible_title = title_parts[0].strip()
                 possible_publisher = title_parts[1].strip()
 
                 if possible_publisher:
+
                     title = possible_title
                     publisher = possible_publisher
 
@@ -73,15 +88,21 @@ def get_news(feed_name, feed_url, limit=10):
             published = None
 
             if pub_date:
+
                 try:
-                    published = parsedate_to_datetime(pub_date)
+
+                    published = parsedate_to_datetime(
+                        pub_date
+                    )
 
                     if published.tzinfo is None:
+
                         published = published.replace(
                             tzinfo=timezone.utc
                         )
 
                 except Exception:
+
                     published = None
 
             news_items.append({
@@ -92,28 +113,40 @@ def get_news(feed_name, feed_url, limit=10):
             })
 
     except Exception as e:
-        print(f"ERROR in {feed_name}: {e}")
+
+        print(
+            f"ERROR in {feed_name}: {e}"
+        )
 
     return news_items
 
 
 def collect_all_news():
+
     all_news = []
 
     for feed_name, feed_url in FEEDS.items():
 
-        print(f"\nCollecting: {feed_name}")
+        print(
+            f"\nCollecting: {feed_name}"
+        )
 
-        news = get_news(feed_name, feed_url)
+        news = get_news(
+            feed_name,
+            feed_url
+        )
 
         all_news.extend(news)
 
-        print(f"Found: {len(news)} headlines")
+        print(
+            f"Found: {len(news)} headlines"
+        )
 
     return all_news
 
 
 def remove_duplicates(news_items):
+
     unique_news = []
     seen_titles = set()
 
@@ -127,15 +160,18 @@ def remove_duplicates(news_items):
             continue
 
         seen_titles.add(normalized)
+
         unique_news.append(item)
 
     return unique_news
 
 
 def sort_by_date(news_items):
+
     return sorted(
         news_items,
-        key=lambda item: item["published"]
+        key=lambda item:
+        item["published"]
         or datetime.min.replace(
             tzinfo=timezone.utc
         ),
@@ -143,33 +179,117 @@ def sort_by_date(news_items):
     )
 
 
-def select_topic(news_items):
+def get_post_window():
+
+    now = datetime.now(
+        INDIA_TZ
+    )
+
+    hour = now.hour
+
+    # सुबह की post:
+    # पिछली शाम 6 बजे से सुबह 10 बजे तक
+    if 6 <= hour < 14:
+
+        start = (
+            now - timedelta(
+                days=1
+            )
+        ).replace(
+            hour=18,
+            minute=0,
+            second=0,
+            microsecond=0
+        )
+
+        end = now
+
+        slot = "MORNING"
+
+    # शाम की post:
+    # सुबह 10 बजे से शाम 6 बजे तक
+    elif 14 <= hour <= 23:
+
+        start = now.replace(
+            hour=10,
+            minute=0,
+            second=0,
+            microsecond=0
+        )
+
+        end = now
+
+        slot = "EVENING"
+
+    else:
+
+        # रात में manual test होने पर
+        # पिछले 12 घंटे की खबरें
+        start = (
+            now - timedelta(
+                hours=12
+            )
+        )
+
+        end = now
+
+        slot = "NIGHT_TEST"
+
+    return start, end, slot
+
+
+def select_topics(
+    news_items,
+    count=10
+):
 
     if not news_items:
-        return None
+        return []
 
-    stop_words = {
-        "के", "का", "की", "को", "से", "में", "और", "पर",
-        "एक", "है", "हैं", "ने", "यह", "इस", "उस",
-        "लिए", "बारे", "बाद", "अब", "भी", "तो",
-        "the", "a", "an", "and", "of", "in", "to",
-        "is", "on", "for"
-    }
+    start, end, slot = get_post_window()
+
+    print(
+        f"\nPost slot: {slot}"
+    )
+
+    print(
+        f"News window: {start} → {end}"
+    )
 
     scored_news = []
 
     for item in news_items:
 
+        score = 0
+
+        published = item["published"]
+
+        # समय की window में आने वाली खबर को priority
+        if published:
+
+            published_india = published.astimezone(
+                INDIA_TZ
+            )
+
+            if start <= published_india <= end:
+
+                score += 10
+
+            else:
+
+                # window से बाहर की पुरानी खबर
+                # कम priority
+                score -= 10
+
+        # दूसरी headlines से similarity
         title_words = {
             word
             for word in normalize_title(
                 item["title"]
             ).split()
-            if word not in stop_words
-            and len(word) > 2
+            if len(word) > 2
         }
 
-        score = 0
         related_count = 0
 
         for other in news_items:
@@ -182,39 +302,58 @@ def select_topic(news_items):
                 for word in normalize_title(
                     other["title"]
                 ).split()
-                if word not in stop_words
-                and len(word) > 2
+                if len(word) > 2
             }
 
-            if not title_words or not other_words:
-                continue
-
-            common_words = title_words & other_words
-
-            similarity = len(common_words) / len(
-                title_words | other_words
+            common_words = (
+                title_words
+                & other_words
             )
 
-            if similarity >= 0.25 and len(common_words) >= 2:
+            if (
+                len(common_words) >= 2
+                and len(common_words)
+                / max(
+                    1,
+                    len(
+                        title_words
+                        | other_words
+                    )
+                ) >= 0.25
+            ):
+
                 related_count += 1
 
+        # एक ही विषय कई headlines में हो
+        # तो उसे थोड़ा priority
         score += related_count * 3
 
-        if item["published"]:
+        # नई खबर को priority
+        if published:
 
             age_hours = (
-                datetime.now(timezone.utc)
-                - item["published"]
+                datetime.now(
+                    timezone.utc
+                ) - published
             ).total_seconds() / 3600
 
             if age_hours <= 6:
-                score += 2
+
+                score += 5
 
             elif age_hours <= 12:
+
+                score += 3
+
+            elif age_hours <= 24:
+
                 score += 1
 
         scored_news.append(
-            (score, item, related_count)
+            (
+                score,
+                item
+            )
         )
 
     scored_news.sort(
@@ -222,19 +361,72 @@ def select_topic(news_items):
         reverse=True
     )
 
-    selected_score, selected, related_count = scored_news[0]
+    selected = []
 
-    print(f"\nSelected topic score: {selected_score}")
-    print(f"Related headlines found: {related_count}")
+    used_titles = set()
+
+    for score, item in scored_news:
+
+        normalized = normalize_title(
+            item["title"]
+        )
+
+        if normalized in used_titles:
+            continue
+
+        used_titles.add(
+            normalized
+        )
+
+        selected.append(item)
+
+        if len(selected) >= count:
+            break
+
+    print(
+        f"\nSelected headlines: {len(selected)}"
+    )
+
+    for index, item in enumerate(
+        selected,
+        start=1
+    ):
+
+        print(
+            f"{index}. {item['title']}"
+        )
 
     return selected
 
 
+# पुराना code compatibility के लिए
+def select_topic(news_items):
+
+    topics = select_topics(
+        news_items,
+        count=1
+    )
+
+    if topics:
+
+        return topics[0]
+
+    return None
+
+
 def main():
 
-    print("\n===================================")
-    print("       NEWS TOPIC SELECTOR")
-    print("===================================")
+    print(
+        "\n==================================="
+    )
+
+    print(
+        "       VEENA NEWS COLLECTOR"
+    )
+
+    print(
+        "==================================="
+    )
 
     all_news = collect_all_news()
 
@@ -256,38 +448,43 @@ def main():
         unique_news
     )
 
-    selected = select_topic(
-        sorted_news
-    )
-
-    if not selected:
-        print("\nNo topic selected.")
-        return
-
-    print("\n===================================")
-    print("        SELECTED TOPIC")
-    print("===================================")
-
-    print(
-        f"\nHeadline: {selected['title']}"
+    selected = select_topics(
+        sorted_news,
+        count=10
     )
 
     print(
-        f"Source: {selected['source']}"
+        "\n==================================="
     )
 
     print(
-        f"Link: {selected['link']}"
+        "        SELECTED HEADLINES"
     )
 
-    if selected["published"]:
+    print(
+        "==================================="
+    )
+
+    for index, item in enumerate(
+        selected,
+        start=1
+    ):
+
         print(
-            f"Published: {selected['published']}"
+            f"\n{index}. {item['title']}"
         )
 
-    print("\n===================================")
-    print("Topic selection completed.")
-    print("===================================")
+        print(
+            f"Source: {item['source']}"
+        )
+
+        print(
+            f"Link: {item['link']}"
+        )
+
+    print(
+        "\n==================================="
+    )
 
 
 if __name__ == "__main__":
