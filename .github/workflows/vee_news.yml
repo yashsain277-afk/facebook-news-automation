@@ -1,0 +1,41 @@
+name: Vee News - Every 6 Hours
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+    - cron: "0 6 * * *"
+    - cron: "0 12 * * *"
+    - cron: "0 18 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  vee-news:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Hindi fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-core fonts-noto-extra
+      - name: Install Python packages
+        run: pip install Pillow feedparser
+      - name: Create and post Vee News
+        env:
+          VEE_NEWS_PAGE_ID: ${{ secrets.VEE_NEWS_PAGE_ID }}
+          VEE_NEWS_PAGE_ACCESS_TOKEN: ${{ secrets.VEE_NEWS_PAGE_ACCESS_TOKEN }}
+        run: python vee_news_automation.py
+      - name: Save Vee News history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vee_news_state.json
+          git diff --cached --quiet || git commit -m "Update Vee News topic history"
+          git push
