@@ -166,9 +166,9 @@ def shorten(text, size, max_width, bold=True):
 
 # Header
 # Use the supplied HS News Times header artwork.
-HEADER_IMAGE = "frm hs.jpeg"
+HEADER_IMAGE = "hs_news_header.png"
 if not os.path.exists(HEADER_IMAGE):
-    raise FileNotFoundError(f"Header image not found: {HEADER_IMAGE}. Please upload frm hs.jpeg to the repository root.")
+    raise FileNotFoundError(f"Header image not found: {HEADER_IMAGE}. The workflow converts hs_news_header.webp to PNG before running.")
 header = Image.open(HEADER_IMAGE).convert("RGB")
 header = header.resize((WIDTH, 283), Image.Resampling.LANCZOS)
 canvas.paste(header, (0, 0))
