@@ -8,9 +8,9 @@ POSTED_FILE="siyast_posted.json"
 
 FEEDS=[
 ("राष्ट्रीय राजनीति","https://news.google.com/rss/search?q=India+politics+Parliament+government+political+parties&hl=hi&gl=IN&ceid=IN:hi"),
-("प्रधानमंत्री और केंद्र","https://news.google.com/rss/search?q=India+Prime+Minister+central+government+politics&hl=hi&gl=IN&ceid=IN:hi"),
-("विपक्ष और संसद","https://news.google.com/rss/search?q=India+opposition+Parliament+politics&hl=hi&gl=IN&ceid=IN:hi"),
-("राज्य राजनीति","https://news.google.com/rss/search?q=Indian+state+politics+Chief+Minister+politics&hl=hi&gl=IN&ceid=IN:hi"),
+("प्रधानमंत्री और केंद्र","https://news.google.com/rss/search?q=India+Prime+Minister+central+government+politics+India&hl=hi&gl=IN&ceid=IN:hi"),
+("विपक्ष और संसद","https://news.google.com/rss/search?q=India+opposition+Parliament+politics+India&hl=hi&gl=IN&ceid=IN:hi"),
+("राज्य राजनीति","https://news.google.com/rss/search?q=India+Indian+state+politics+Chief+Minister+politics&hl=hi&gl=IN&ceid=IN:hi"),
 ]
 
 try: posted=json.load(open(POSTED_FILE,encoding="utf-8"))
@@ -31,7 +31,8 @@ for category,url in FEEDS:
         items.append((dt,category,title,summary,source,link))
 
 items.sort(key=lambda x:x[0],reverse=True)
-if not items: raise SystemExit("No new political story found.")
+if not items:
+    raise SystemExit("No new Indian political story found. Try the workflow again later.")
 _,category,title,summary,source,link=items[0]
 
 # Keep the post factual and neutral. The text is built from the news item's supplied summary.
