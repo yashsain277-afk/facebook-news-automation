@@ -38,6 +38,12 @@ jobs:
       - name: Install Python packages
         run: pip install Pillow feedparser
 
+      - name: Convert HSNews header to PNG
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y webp
+          dwebp hs_news_header.webp -o hs_news_header.png
+
       - name: Collect local news
         run: python news_collector.py
 
