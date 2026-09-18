@@ -69,9 +69,9 @@ im.save("smart_code_technology.jpg",quality=94)
 
 boundary=uuid.uuid4().hex
 data=open("smart_code_technology.jpg","rb").read()
-body=(f"--{boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n{caption}\r\n"
-      f"--{boundary}\r\nContent-Disposition: form-data; name="access_token"\r\n\r\n{TOKEN}\r\n"
-      f"--{boundary}\r\nContent-Disposition: form-data; name="source"; filename="smart_code_technology.jpg"\r\n"
+body=(f"--{boundary}\r\nContent-Disposition: form-data; name=\\"caption\\"\r\n\r\n{caption}\r\n"
+      f"--{boundary}\r\nContent-Disposition: form-data; name=\\"access_token\\"\r\n\r\n{TOKEN}\r\n"
+      f"--{boundary}\r\nContent-Disposition: form-data; name=\\"source\\"; filename="smart_code_technology.jpg"\r\n"
       f"Content-Type: image/jpeg\r\n\r\n").encode()+data+f"\r\n--{boundary}--\r\n".encode()
 req=urllib.request.Request(f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos",data=body,headers={"Content-Type":f"multipart/form-data; boundary={boundary}"},method="POST")
 with urllib.request.urlopen(req,timeout=60) as r: print("Facebook post:",r.read().decode())
