@@ -125,20 +125,40 @@ def font(path,size):
 def safe_text(text):
     return re.sub(r"[^\u0900-\u097F A-Za-z0-9.,!?;:'\"()/#%&+\-–—₹|]"," ",str(text))
 
-def text_font(size,bold=False):
-    # Render the complete string with a Devanagari-capable font so Hindi
-    # combining marks are shaped correctly. Per-character rendering breaks
-    # Devanagari matras and creates the dotted/garbled appearance.
-    return font(HINDI_BOLD if bold else HINDI,size)
+def _font_for_run(run,size,bold=False):
+    # Keep each Hindi run intact for proper Devanagari shaping, while using
+    # DejaVu Sans for Latin text, digits and punctuation that Noto may miss.
+    is_hindi=any("\\u0900"<=ch<="\\u097F" for ch in run)
+    return font(HINDI_BOLD if bold else HINDI,size) if is_hindi else font(ENG_BOLD if bold else ENG,size)
+
+def _runs(text):
+    text=safe_text(text)
+    if not text: return []
+    runs=[]; cur=text[0]; cur_hindi="\\u0900"<=text[0]<="\\u097F"
+    for ch in text[1:]:
+        h="\\u0900"<=ch<="\\u097F"
+        # Group Hindi characters together; keep Latin/number/punctuation together.
+        if h==cur_hindi:
+            cur+=ch
+        else:
+            runs.append((cur,cur_hindi)); cur=ch; cur_hindi=h
+    runs.append((cur,cur_hindi))
+    return runs
 
 def mixed_width(draw,text,size,bold=False):
-    f=text_font(size,bold)
-    b=draw.textbbox((0,0),safe_text(text),font=f)
-    return b[2]-b[0]
+    total=0
+    for run,_ in _runs(text):
+        f=_font_for_run(run,size,bold)
+        b=draw.textbbox((0,0),run,font=f)
+        total+=b[2]-b[0]
+    return total
 
 def draw_mixed(draw,xy,text,size,fill,bold=False):
-    f=text_font(size,bold)
-    draw.text(xy,safe_text(text),font=f,fill=fill,language="hi",direction="ltr")
+    x,y=xy
+    for run,is_hindi in _runs(text):
+        f=_font_for_run(run,size,bold)
+        draw.text((x,y),run,font=f,fill=fill,language="hi" if is_hindi else None)
+        x=draw.textbbox((x,y),run,font=f)[2]
 
 def wrap_mixed(draw,text,size,max_width,bold=False,max_lines=3):
     words=safe_text(text).split(); lines=[]; cur=""
