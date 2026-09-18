@@ -116,9 +116,21 @@ subprocess.run(
     check=True,
 )
 
-message = """📰 आज की 10 बड़ी खबरें
+# Use the exact same headlines that appear in the image in the Facebook caption.
+caption_lines = ["📰 आज की 10 बड़ी स्थानीय खबरें", ""]
+for index, item in enumerate(selected_news, start=1):
+    caption_lines.append(f"{index}. {item['title']}")
+    caption_lines.append(f"   स्रोत: {item['source']}")
+    if index != len(selected_news):
+        caption_lines.append("")
 
-#VeenaNews #HindiNews #News"""
+caption_lines.extend([
+    "",
+    "📍 अंता | बारां | राजस्थान",
+    "",
+    "#VeenaNews #Anta #Baran #RajasthanNews #LocalNews #HindiNews"
+])
+message = "\n".join(caption_lines)
 
 photo_url = f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos"
 boundary = uuid.uuid4().hex
