@@ -16,6 +16,12 @@ from news_collector import (
 PAGE_ID = os.environ["FB_PAGE_ID"]
 ACCESS_TOKEN = os.environ["FB_PAGE_ACCESS_TOKEN"]
 POSTED_FILE = os.environ.get("POSTED_FILE", "posted_news.json")
+PAGE_NAME = os.environ.get("PAGE_NAME", "Veena News")
+LOCATION_LINE = os.environ.get("LOCATION_LINE", "📍 अंता | बारां | राजस्थान")
+HASHTAGS = os.environ.get(
+    "HASHTAGS",
+    "#VeenaNews #Anta #Baran #RajasthanNews #LocalNews #HindiNews",
+)
 
 try:
     with open(POSTED_FILE, "r", encoding="utf-8") as file:
@@ -23,13 +29,11 @@ try:
 except Exception:
     posted_news = []
 
-# Protect only the most recent posts from immediate repetition.
 recent_posted_news = posted_news[-10:]
 
 all_news = collect_all_news()
 unique_news = remove_duplicates(all_news)
 
-# Remove social-media/junk sources before selecting headlines.
 filtered_news = []
 for item in unique_news:
     source = str(item.get("source", "")).strip().lower()
@@ -46,14 +50,11 @@ for item in unique_news:
     filtered_news.append(item)
 
 sorted_news = sort_by_date(filtered_news)
-
-# Use the normal time-window selection for fresh news.
 window_news = select_topics(sorted_news, count=20)
 
 selected_news = []
 selected_links = set()
 
-# Pass 1: choose fresh/window news that is not among the 10 most recent posts.
 for item in window_news:
     normalized_title = normalize_title(item["title"])
     already_posted = False
@@ -77,9 +78,6 @@ for item in window_news:
     if len(selected_news) >= 10:
         break
 
-# Pass 2: if the window overlaps with recent posts, fill from the latest
-# available filtered news. This guarantees a full 10-headline image whenever
-# at least 10 usable RSS headlines exist.
 if len(selected_news) < 10:
     for item in sorted_news:
         if item["link"] in selected_links:
@@ -106,33 +104,20 @@ for index, item in enumerate(selected_news, start=1):
     print(f"{index}. {item['title']}")
     print(f"   Source: {item['source']}")
 
-# Final template input: headline || source
-image_items = [
-    f"{item['title']} || {item['source']}"
-    for item in selected_news
-]
+image_items = [f"{item['title']} || {item['source']}" for item in selected_news]
 image_input = "
 ".join(image_items)
 
-subprocess.run(
-    ["python", "image_generator.py", image_input],
-    check=True,
-)
+subprocess.run(["python", "image_generator.py", image_input], check=True)
 
-# Use the exact same headlines that appear in the image in the Facebook caption.
-caption_lines = ["📰 आज की 10 बड़ी स्थानीय खबरें", ""]
+caption_lines = [f"📰 {PAGE_NAME} - आज की 10 बड़ी स्थानीय खबरें", ""]
 for index, item in enumerate(selected_news, start=1):
     caption_lines.append(f"{index}. {item['title']}")
     caption_lines.append(f"   स्रोत: {item['source']}")
     if index != len(selected_news):
         caption_lines.append("")
 
-caption_lines.extend([
-    "",
-    "📍 अंता | बारां | राजस्थान",
-    "",
-    "#VeenaNews #Anta #Baran #RajasthanNews #LocalNews #HindiNews"
-])
+caption_lines.extend(["", LOCATION_LINE, "", HASHTAGS])
 message = "
 ".join(caption_lines)
 
