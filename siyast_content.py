@@ -22,9 +22,6 @@ for category,url in FEEDS:
     for e in feed.entries[:15]:
         title=html.unescape(re.sub(r"\s+"," ",e.get("title","")).strip())
         if not title or title in posted: continue
-        combined=(title+" "+html.unescape(e.get("summary",""))).lower()
-        indian_terms=["india","indian","bharat","भारत","भारतीय","modi","rahul","gandhi","bjp","congress","parliament","loksabha","rajya sabha","chief minister","मुख्यमंत्री","संसद","लोकसभा","राज्यसभा","भाजपा","कांग्रेस"]
-        if not any(term in combined for term in indian_terms): continue
         dt=datetime.min.replace(tzinfo=timezone.utc)
         if e.get("published_parsed"): dt=datetime(*e.published_parsed[:6],tzinfo=timezone.utc)
         summary=html.unescape(re.sub(r"<[^>]+>"," ",e.get("summary","")))
