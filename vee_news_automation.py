@@ -117,7 +117,10 @@ HINDI_BOLD="/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
 ENG="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 ENG_BOLD="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-def font(path,size): return ImageFont.truetype(path,size)
+def font(path,size):
+    # Use HarfBuzz/FriBidi shaping through Pillow's RAQM engine.
+    # This is required for correct Devanagari glyphs and matras in Hindi.
+    return ImageFont.truetype(path,size,layout_engine=ImageFont.Layout.RAQM)
 
 def safe_text(text):
     return re.sub(r"[^\u0900-\u097F A-Za-z0-9.,!?;:'\"()/#%&+\-–—₹|]"," ",str(text))
@@ -135,7 +138,7 @@ def mixed_width(draw,text,size,bold=False):
 
 def draw_mixed(draw,xy,text,size,fill,bold=False):
     f=text_font(size,bold)
-    draw.text(xy,safe_text(text),font=f,fill=fill)
+    draw.text(xy,safe_text(text),font=f,fill=fill,language="hi",direction="ltr")
 
 def wrap_mixed(draw,text,size,max_width,bold=False,max_lines=3):
     words=safe_text(text).split(); lines=[]; cur=""
