@@ -170,8 +170,7 @@ try:
 Facebook image post successful:")
     print(result)
 except urllib.error.HTTPError as e:
-    print("
-Facebook image post failed:")
+    print("\nFacebook image post failed:")
     print("HTTP Status:", e.code)
     error_body = e.read().decode("utf-8", errors="replace")
     print("Facebook error response:")
@@ -192,6 +191,5 @@ posted_news = posted_news[-100:]
 with open(POSTED_FILE, "w", encoding="utf-8") as file:
     json.dump(posted_news, file, ensure_ascii=False, indent=2)
 
-print("
-10 news links saved.")
+print("\n10 news links saved.")
 print("Recent duplicate protection completed.")
