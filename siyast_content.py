@@ -64,48 +64,74 @@ caption=(f"📰 सियासत | {title}\n\n{text}\n\n"
          f"🔗 मूल समाचार: {link}\n\n"
          f"#Siyasat #IndianPolitics #Bharat #IndianDemocracy #PoliticalNews")
 
-# Find a relevant freely reusable Wikimedia Commons image.
-query_words=re.sub(r"[^\w\s]"," ",title,flags=re.UNICODE).split()
-query=" ".join(query_words[:8])+" Indian politician"
-img_url=None
-try:
-    params={"action":"query","generator":"search","gsrsearch":query,"gsrnamespace":6,
-            "gsrlimit":5,"prop":"imageinfo","iiprop":"url","iiurlwidth":1200,"format":"json"}
-    data=requests.get("https://commons.wikimedia.org/w/api.php",params=params,timeout=20).json()
-    pages=data.get("query",{}).get("pages",{})
-    for p in pages.values():
-        info=(p.get("imageinfo") or [{}])[0]
-        u=info.get("thumburl") or info.get("url")
-        if u and u.lower().split("?")[0].endswith((".jpg",".jpeg",".png",".webp")):
-            img_url=u; break
-except Exception as e:
-    print("Wikimedia search failed:",e)
+# Find a relevant Wikimedia Commons image of the named politician or party.
+people = [
+    ("Narendra Modi", ["modi", "narendra modi", "प्रधानमंत्री"]),
+    ("Rahul Gandhi", ["rahul gandhi", "राहुल गांधी"]),
+    ("Amit Shah", ["amit shah", "अमित शाह"]),
+    ("Sonia Gandhi", ["sonia gandhi", "सोनिया गांधी"]),
+    ("Mallikarjun Kharge", ["mallikarjun kharge", "खड़गे"]),
+    ("Arvind Kejriwal", ["arvind kejriwal", "केजरीवाल"]),
+    ("Mamata Banerjee", ["mamata banerjee", "ममता बनर्जी"]),
+    ("Yogi Adityanath", ["yogi adityanath", "योगी आदित्यनाथ"]),
+    ("Nirmala Sitharaman", ["nirmala sitharaman", "निर्मला सीतारमण"]),
+    ("Rajnath Singh", ["rajnath singh", "राजनाथ सिंह"]),
+    ("Akhilesh Yadav", ["akhilesh yadav", "अखिलेश यादव"]),
+    ("Nitish Kumar", ["nitish kumar", "नीतीश कुमार"]),
+    ("S Jaishankar", ["s jaishankar", "jaishankar", "जयशंकर"]),
+]
+low = title.lower()
+person = next((name for name, terms in people if any(term in low for term in terms)), None)
+
+def commons_image(search_term):
+    try:
+        params = {
+            "action":"query","generator":"search","gsrsearch":search_term,
+            "gsrnamespace":6,"gsrlimit":10,"prop":"imageinfo",
+            "iiprop":"url","iiurlwidth":1200,"format":"json"
+        }
+        data=requests.get("https://commons.wikimedia.org/w/api.php",params=params,timeout=20).json()
+        for p in data.get("query",{}).get("pages",{}).values():
+            info=(p.get("imageinfo") or [{}])[0]
+            u=info.get("thumburl") or info.get("url")
+            if u and u.lower().split("?")[0].endswith((".jpg",".jpeg",".png",".webp")):
+                return u
+    except Exception as ex:
+        print("Wikimedia search failed:", ex)
+    return None
+
+img_url = commons_image(person) if person else commons_image(title[:120])
 
 W,H=1200,800
 if img_url:
     try:
         raw=requests.get(img_url,timeout=30).content
         open("siyast_source.jpg","wb").write(raw)
-        im=Image.open("siyast_source.jpg").convert("RGB").resize((W,H))
+        im=Image.open("siyast_source.jpg").convert("RGB")
+        im.thumbnail((W,H))
+        canvas=Image.new("RGB",(W,H),(20,24,35))
+        x=(W-im.width)//2; y=(H-im.height)//2
+        canvas.paste(im,(x,y))
+        im=canvas
     except Exception:
-        im=Image.new("RGB",(W,H),(24,30,45))
+        im=Image.new("RGB",(W,H),(20,24,35))
 else:
-    im=Image.new("RGB",(W,H),(24,30,45))
+    im=Image.new("RGB",(W,H),(20,24,35))
 
 d=ImageDraw.Draw(im)
 font="/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
 reg="/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
-fb=ImageFont.truetype(font,48); fr=ImageFont.truetype(reg,28)
-d.rectangle((0,0,W,105),fill=(15,20,30))
-d.text((45,25),"सियासत",font=fb,fill=(245,245,245))
-d.text((45,690),"भारतीय राजनीति • तथ्य • इतिहास • संदर्भ",font=fr,fill=(245,245,245))
-lines=textwrap.wrap(title,width=38)
-y=130
-for ln in lines[:4]:
-    d.text((45,y),ln,font=fb,fill=(255,255,255),stroke_width=2,stroke_fill=(0,0,0))
-    y+=58
-im.save("siyast_post.jpg",quality=92)
-
+fb=ImageFont.truetype(font,52)
+fr=ImageFont.truetype(reg,30)
+d.rectangle((0,0,W,105),fill=(12,16,25))
+d.text((45,22),"सियासत",font=fb,fill=(245,245,245))
+d.rectangle((0,665,W,800),fill=(12,16,25))
+label = "ताज़ा भारतीय राजनीतिक अपडेट"
+d.text((45,685),label,font=fr,fill=(245,245,245))
+if person:
+    d.text((45,735),person,font=fr,fill=(220,225,235))
+else:
+    d.text((45,735),"तथ्य • इतिहास • संदर्भ",font=fr,fill=(220,225,235))
 with open("siyast_post.jpg","rb") as f:
     r=requests.post(f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos",
         data={"caption":caption,"access_token":TOKEN},
