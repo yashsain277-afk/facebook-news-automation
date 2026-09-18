@@ -89,14 +89,12 @@ if len(selected_news) < 10:
             break
 
 if not selected_news:
-    print("
-कोई usable news उपलब्ध नहीं है — आज post नहीं किया जाएगा।")
+    print("\nकोई usable news उपलब्ध नहीं है — आज post नहीं किया जाएगा।")
     raise SystemExit(0)
 
 selected_news = selected_news[:10]
 
-print("
-===================================")
+print("\n===================================")
 print(f"       SELECTED {len(selected_news)} HEADLINES")
 print("===================================")
 
@@ -105,8 +103,7 @@ for index, item in enumerate(selected_news, start=1):
     print(f"   Source: {item['source']}")
 
 image_items = [f"{item['title']} || {item['source']}" for item in selected_news]
-image_input = "
-".join(image_items)
+image_input = "\n".join(image_items)
 
 subprocess.run(["python", "image_generator.py", image_input], check=True)
 
@@ -118,8 +115,7 @@ for index, item in enumerate(selected_news, start=1):
         caption_lines.append("")
 
 caption_lines.extend(["", LOCATION_LINE, "", HASHTAGS])
-message = "
-".join(caption_lines)
+message = "\n".join(caption_lines)
 
 photo_url = f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos"
 boundary = uuid.uuid4().hex
@@ -128,33 +124,19 @@ with open("news_image.jpg", "rb") as image_file:
     image_data = image_file.read()
 
 body = (
-    f"--{boundary}
-"
-    f'Content-Disposition: form-data; name="caption"
-
-'
-    f"{message}
-"
-    f"--{boundary}
-"
-    f'Content-Disposition: form-data; name="access_token"
-
-'
-    f"{ACCESS_TOKEN}
-"
-    f"--{boundary}
-"
-    f'Content-Disposition: form-data; name="source"; filename="news_image.jpg"
-'
-    f"Content-Type: image/jpeg
-
-"
+    f"--{boundary}\r\n"
+    f'Content-Disposition: form-data; name="caption"\r\n\r\n'
+    f"{message}\r\n"
+    f"--{boundary}\r\n"
+    f'Content-Disposition: form-data; name="access_token"\r\n\r\n'
+    f"{ACCESS_TOKEN}\r\n"
+    f"--{boundary}\r\n"
+    f'Content-Disposition: form-data; name="source"; filename="news_image.jpg"\r\n'
+    f"Content-Type: image/jpeg\r\n\r\n"
 ).encode("utf-8")
 
 body += image_data
-body += f"
---{boundary}--
-".encode("utf-8")
+body += f"\r\n--{boundary}--\r\n".encode("utf-8")
 
 request = urllib.request.Request(
     photo_url,
@@ -166,8 +148,7 @@ request = urllib.request.Request(
 try:
     with urllib.request.urlopen(request, timeout=60) as response:
         result = response.read().decode("utf-8")
-    print("
-Facebook image post successful:")
+    print("\nFacebook image post successful:")
     print(result)
 except urllib.error.HTTPError as e:
     print("\nFacebook image post failed:")
@@ -177,8 +158,7 @@ except urllib.error.HTTPError as e:
     print(error_body)
     raise
 except Exception as e:
-    print("
-Facebook image post failed:")
+    print("\nFacebook image post failed:")
     print(e)
     raise
 
