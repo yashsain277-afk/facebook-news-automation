@@ -1,0 +1,60 @@
+name: HSNews Time - Local Every 2 Hours
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 0 * * *"   # 6:00 AM IST
+    - cron: "30 2 * * *"   # 8:00 AM IST
+    - cron: "30 4 * * *"   # 10:00 AM IST
+    - cron: "30 6 * * *"   # 12:00 PM IST
+    - cron: "30 8 * * *"   # 2:00 PM IST
+    - cron: "30 10 * * *"  # 4:00 PM IST
+    - cron: "30 12 * * *"  # 6:00 PM IST
+    - cron: "30 14 * * *"  # 8:00 PM IST
+    - cron: "30 16 * * *"  # 10:00 PM IST
+    - cron: "30 18 * * *"  # 12:00 AM IST
+
+permissions:
+  contents: write
+
+jobs:
+  post-hsnews:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Hindi font
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-core fonts-noto-extra
+
+      - name: Install Python packages
+        run: pip install Pillow feedparser
+
+      - name: Collect local news
+        run: python news_collector.py
+
+      - name: Post to HSNews Time Facebook Page
+        env:
+          FB_PAGE_ID: "361282040719868"
+          FB_PAGE_ACCESS_TOKEN: ${{ secrets.HS_FB_PAGE_ACCESS_TOKEN }}
+          POSTED_FILE: hs_posted_news.json
+          PAGE_NAME: "HSNews Time"
+          LOCATION_LINE: "📍 अंता | बारां | राजस्थान"
+          HASHTAGS: "#HSNewsTime #Anta #Baran #RajasthanNews #LocalNews #HindiNews"
+        run: python facebook_test.py
+
+      - name: Save HSNews posted news
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hs_posted_news.json
+          git diff --cached --quiet || git commit -m "Update HSNews Time posted news"
+          git push
