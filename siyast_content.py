@@ -22,6 +22,9 @@ for category,url in FEEDS:
     for e in feed.entries[:15]:
         title=html.unescape(re.sub(r"\s+"," ",e.get("title","")).strip())
         if not title or title in posted: continue
+        combined=(title+" "+html.unescape(e.get("summary",""))).lower()
+        indian_terms=["india","indian","bharat","भारत","भारतीय","modi","rahul","gandhi","bjp","congress","parliament","loksabha","rajya sabha","chief minister","मुख्यमंत्री","संसद","लोकसभा","राज्यसभा","भाजपा","कांग्रेस"]
+        if not any(term in combined for term in indian_terms): continue
         dt=datetime.min.replace(tzinfo=timezone.utc)
         if e.get("published_parsed"): dt=datetime(*e.published_parsed[:6],tzinfo=timezone.utc)
         summary=html.unescape(re.sub(r"<[^>]+>"," ",e.get("summary","")))
@@ -65,7 +68,7 @@ caption=(f"📰 सियासत | {title}\n\n{text}\n\n"
 
 # Find a relevant freely reusable Wikimedia Commons image.
 query_words=re.sub(r"[^\w\s]"," ",title,flags=re.UNICODE).split()
-query=" ".join(query_words[:8])
+query=" ".join(query_words[:8])+" Indian politician"
 img_url=None
 try:
     params={"action":"query","generator":"search","gsrsearch":query,"gsrnamespace":6,
@@ -92,8 +95,8 @@ else:
     im=Image.new("RGB",(W,H),(24,30,45))
 
 d=ImageDraw.Draw(im)
-font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-reg="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+font="/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
+reg="/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
 fb=ImageFont.truetype(font,48); fr=ImageFont.truetype(reg,28)
 d.rectangle((0,0,W,105),fill=(15,20,30))
 d.text((45,25),"सियासत",font=fb,fill=(245,245,245))
