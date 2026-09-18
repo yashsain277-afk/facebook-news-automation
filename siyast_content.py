@@ -78,6 +78,7 @@ people = [
     ("Rajnath Singh", ["rajnath singh", "राजनाथ सिंह"]),
     ("Akhilesh Yadav", ["akhilesh yadav", "अखिलेश यादव"]),
     ("Nitish Kumar", ["nitish kumar", "नीतीश कुमार"]),
+    ("Nayab Singh Saini", ["nayab singh saini", "nayab saini", "नायब सिंह सैनी"]),
     ("S Jaishankar", ["s jaishankar", "jaishankar", "जयशंकर"]),
 ]
 low = title.lower()
@@ -120,7 +121,7 @@ else:
 
 d=ImageDraw.Draw(im)
 font="/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
-reg="/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
+reg="/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
 fb=ImageFont.truetype(font,52)
 fr=ImageFont.truetype(reg,30)
 d.rectangle((0,0,W,105),fill=(12,16,25))
