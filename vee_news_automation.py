@@ -120,7 +120,7 @@ ENG_BOLD="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 def font(path,size): return ImageFont.truetype(path,size)
 
 def safe_text(text):
-    return re.sub(r'[^\u0900-\u097F A-Za-z0-9.,!?;:'"()/#%&+\-–—₹|]'," ",str(text))
+    return re.sub(r"[^\u0900-\u097F A-Za-z0-9.,!?;:'\"()/#%&+\-–—₹|]"," ",str(text))
 
 def mixed_width(draw,text,size,bold=False):
     hf,ef=font(HINDI_BOLD if bold else HINDI,size),font(ENG_BOLD if bold else ENG,size)
