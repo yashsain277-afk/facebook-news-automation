@@ -88,14 +88,13 @@ def load_state():
 
 def choose_topic(all_items, state):
     posts = state.get("posts", [])
-    # Four cricket posts followed by one non-cricket slot = 80% target.
-    want_cricket = (len(posts) % 5) < 4
+    # Vee News is now cricket-only. Prefer Indian cricket first, then other
+    # cricket stories; never fall back to general/non-cricket news.
     cricket = [x for x in all_items if x["kind"]=="cricket"]
-    general = [x for x in all_items if x["kind"]=="general"]
     recent = {p.get("link") for p in posts[-20:]}
-    pool = cricket if want_cricket else general
-    pool = [x for x in pool if x["link"] not in recent]
-    if not pool: pool = [x for x in all_items if x["link"] not in recent]
+    pool = [x for x in cricket if x["link"] not in recent]
+    if not pool:
+        pool = cricket
     return sorted(pool,key=lambda x:x["published"],reverse=True)[0] if pool else None
 
 def simple_title(item):
