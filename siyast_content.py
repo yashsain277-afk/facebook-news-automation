@@ -28,12 +28,16 @@ for category,url in FEEDS:
         summary=re.sub(r"\s+"," ",summary).strip()
         source=e.get("source",{}).get("title","") or "News source"
         link=e.get("link","")
-        items.append((dt,category,title,summary,source,link))
+        media_url = None
+        media = e.get("media_content") or e.get("media_thumbnail") or []
+        if media and isinstance(media, list):
+            media_url = media[0].get("url")
+        items.append((dt,category,title,summary,source,link,media_url))
 
 items.sort(key=lambda x:x[0],reverse=True)
 if not items:
     raise SystemExit("No new Indian political story found. Try the workflow again later.")
-_,category,title,summary,source,link=items[0]
+_,category,title,summary,source,link,news_image_url=items[0]
 
 # Keep the post factual and neutral. The text is built from the news item's supplied summary.
 summary=summary[:1600]
@@ -102,6 +106,8 @@ def commons_image(search_term):
     return None
 
 img_url = commons_image(person) if person else commons_image(title[:120])
+if not img_url and news_image_url:
+    img_url = news_image_url
 
 W,H=1200,800
 if img_url:
@@ -133,6 +139,9 @@ if person:
     d.text((45,735),person,font=fr,fill=(220,225,235))
 else:
     d.text((45,735),"तथ्य • इतिहास • संदर्भ",font=fr,fill=(220,225,235))
+
+im.save("siyast_post.jpg", quality=92)
+
 with open("siyast_post.jpg","rb") as f:
     r=requests.post(f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos",
         data={"caption":caption,"access_token":TOKEN},
