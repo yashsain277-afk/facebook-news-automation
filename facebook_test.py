@@ -15,7 +15,7 @@ from news_collector import (
 
 PAGE_ID = os.environ["FB_PAGE_ID"]
 ACCESS_TOKEN = os.environ["FB_PAGE_ACCESS_TOKEN"]
-POSTED_FILE = "posted_news.json"
+POSTED_FILE = os.environ.get("POSTED_FILE", "posted_news.json")
 
 try:
     with open(POSTED_FILE, "r", encoding="utf-8") as file:
@@ -91,12 +91,14 @@ if len(selected_news) < 10:
             break
 
 if not selected_news:
-    print("\nकोई usable news उपलब्ध नहीं है — आज post नहीं किया जाएगा।")
+    print("
+कोई usable news उपलब्ध नहीं है — आज post नहीं किया जाएगा।")
     raise SystemExit(0)
 
 selected_news = selected_news[:10]
 
-print("\n===================================")
+print("
+===================================")
 print(f"       SELECTED {len(selected_news)} HEADLINES")
 print("===================================")
 
@@ -109,7 +111,8 @@ image_items = [
     f"{item['title']} || {item['source']}"
     for item in selected_news
 ]
-image_input = "\n".join(image_items)
+image_input = "
+".join(image_items)
 
 subprocess.run(
     ["python", "image_generator.py", image_input],
@@ -130,7 +133,8 @@ caption_lines.extend([
     "",
     "#VeenaNews #Anta #Baran #RajasthanNews #LocalNews #HindiNews"
 ])
-message = "\n".join(caption_lines)
+message = "
+".join(caption_lines)
 
 photo_url = f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos"
 boundary = uuid.uuid4().hex
@@ -139,19 +143,33 @@ with open("news_image.jpg", "rb") as image_file:
     image_data = image_file.read()
 
 body = (
-    f"--{boundary}\r\n"
-    f'Content-Disposition: form-data; name="caption"\r\n\r\n'
-    f"{message}\r\n"
-    f"--{boundary}\r\n"
-    f'Content-Disposition: form-data; name="access_token"\r\n\r\n'
-    f"{ACCESS_TOKEN}\r\n"
-    f"--{boundary}\r\n"
-    f'Content-Disposition: form-data; name="source"; filename="news_image.jpg"\r\n'
-    f"Content-Type: image/jpeg\r\n\r\n"
+    f"--{boundary}
+"
+    f'Content-Disposition: form-data; name="caption"
+
+'
+    f"{message}
+"
+    f"--{boundary}
+"
+    f'Content-Disposition: form-data; name="access_token"
+
+'
+    f"{ACCESS_TOKEN}
+"
+    f"--{boundary}
+"
+    f'Content-Disposition: form-data; name="source"; filename="news_image.jpg"
+'
+    f"Content-Type: image/jpeg
+
+"
 ).encode("utf-8")
 
 body += image_data
-body += f"\r\n--{boundary}--\r\n".encode("utf-8")
+body += f"
+--{boundary}--
+".encode("utf-8")
 
 request = urllib.request.Request(
     photo_url,
@@ -163,17 +181,20 @@ request = urllib.request.Request(
 try:
     with urllib.request.urlopen(request, timeout=60) as response:
         result = response.read().decode("utf-8")
-    print("\nFacebook image post successful:")
+    print("
+Facebook image post successful:")
     print(result)
 except urllib.error.HTTPError as e:
-    print("\nFacebook image post failed:")
+    print("
+Facebook image post failed:")
     print("HTTP Status:", e.code)
     error_body = e.read().decode("utf-8", errors="replace")
     print("Facebook error response:")
     print(error_body)
     raise
 except Exception as e:
-    print("\nFacebook image post failed:")
+    print("
+Facebook image post failed:")
     print(e)
     raise
 
@@ -186,5 +207,6 @@ posted_news = posted_news[-100:]
 with open(POSTED_FILE, "w", encoding="utf-8") as file:
     json.dump(posted_news, file, ensure_ascii=False, indent=2)
 
-print("\n10 news links saved.")
+print("
+10 news links saved.")
 print("Recent duplicate protection completed.")
