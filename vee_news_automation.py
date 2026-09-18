@@ -133,15 +133,15 @@ def safe_text(text):
     return re.sub(r"[^\u0900-\u097F A-Za-z0-9.,!?;:'\"()/#%&+\-–—₹|]"," ",str(text))
 
 def _font_for_run(run,size,bold=False):
-    is_hindi=any("\\u0900"<=ch<="\\u097F" for ch in run)
+    is_hindi=any("\u0900"<=ch<="\u097F" for ch in run)
     return font(HINDI_BOLD if bold else HINDI,size) if is_hindi else font(ENG_BOLD if bold else ENG,size)
 
 def _runs(text):
     text=safe_text(text)
     if not text: return []
-    runs=[]; cur=text[0]; cur_hindi="\\u0900"<=text[0]<="\\u097F"
+    runs=[]; cur=text[0]; cur_hindi="\u0900"<=text[0]<="\u097F"
     for ch in text[1:]:
-        h="\\u0900"<=ch<="\\u097F"
+        h="\u0900"<=ch<="\u097F"
         if h==cur_hindi:
             cur+=ch
         else:
