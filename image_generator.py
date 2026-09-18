@@ -24,7 +24,7 @@ items = items[:10]
 
 BACKGROUND = "veena news background.jpg"
 OUTPUT = "news_image.jpg"
-WIDTH, HEIGHT = 1200, 800
+WIDTH, HEIGHT = 1200, 900
 
 if not os.path.exists(BACKGROUND):
     raise FileNotFoundError(f"Background image not found: {BACKGROUND}")
@@ -165,26 +165,27 @@ def shorten(text, size, max_width, bold=True):
 
 
 # Header
-# Keep the simple blue branded header used by the final template.
-draw.rectangle([0, 0, WIDTH, 145], fill=BLUE)
-page_font = font(ENGLISH_BOLD, 42)
-draw.text((315, 24), "Veena News", fill=WHITE, font=page_font)
-draw_mixed_text((315, 82), "सच्ची खबर  |  हर समय  |  आपके साथ", 24, WHITE)
-draw_mixed_text((850, 82), "आज की खबरें", 24, WHITE)
+# Use the supplied HS News Times header artwork.
+HEADER_IMAGE = "hs_news_header.webp"
+if not os.path.exists(HEADER_IMAGE):
+    raise FileNotFoundError(f"Header image not found: {HEADER_IMAGE}")
+header = Image.open(HEADER_IMAGE).convert("RGB")
+header = header.resize((WIDTH, 283), Image.Resampling.LANCZOS)
+canvas.paste(header, (0, 0))
 
 # Main white panel
-draw.rounded_rectangle([30, 165, 1170, 770], radius=12, fill=WHITE)
+draw.rounded_rectangle([30, 300, 1170, 890], radius=12, fill=WHITE)
 
 # Red title banner
-draw.rounded_rectangle([190, 155, 1010, 255], radius=18, fill=RED)
+draw.rounded_rectangle([190, 290, 1010, 390], radius=18, fill=RED)
 for x in (145, 172):
     draw.polygon(
-        [(x, 170), (x + 22, 170), (x - 2, 238), (x - 24, 238)],
+        [(x, 305), (x + 22, 305), (x - 2, 373), (x - 24, 373)],
         fill=BLUE,
     )
 for x in (1030, 1057):
     draw.polygon(
-        [(x, 170), (x + 22, 170), (x + 46, 238), (x + 24, 238)],
+        [(x, 305), (x + 22, 305), (x + 46, 373), (x + 24, 373)],
         fill=BLUE,
     )
 
@@ -192,7 +193,7 @@ title = "आज की 10 बड़ी खबरें"
 title_font_size = 54
 title_width = mixed_text_width(title, title_font_size, bold=True)
 draw_mixed_text(
-    ((190 + 1010 - title_width) // 2, 171),
+    ((190 + 1010 - title_width) // 2, 306),
     title,
     title_font_size,
     WHITE,
@@ -206,7 +207,7 @@ number_font = font(ENGLISH_BOLD, 22)
 NUMBER_X = 108
 TEXT_X = 160
 TEXT_RIGHT = 1135
-START_Y = 278
+START_Y = 410
 ROW_HEIGHT = 43
 
 for index in range(10):
@@ -271,11 +272,11 @@ for index in range(10):
 # Footer
 draw.line([(70, 705), (1130, 705)], fill=BLUE, width=3)
 footer_font = font(ENGLISH_BOLD, 25)
-draw.text((70, 720), "Veena News", fill=BLUE, font=footer_font)
-hashtags = "#VeenaNews   #HindiNews   #News"
+draw.text((70, 855), "HS News Times", fill=BLUE, font=footer_font)
+hashtags = "#HSNewsTimes   #HindiNews   #LocalNews"
 hb = draw.textbbox((0, 0), hashtags, font=footer_font)
 hw = hb[2] - hb[0]
-draw.text((1130 - hw, 725), hashtags, fill=BLUE, font=font(ENGLISH_BOLD, 18))
+draw.text((1130 - hw, 858), hashtags, fill=BLUE, font=font(ENGLISH_BOLD, 18))
 
 canvas.save(OUTPUT, quality=95, optimize=True)
-print(f"Final Veena News template image created: {OUTPUT}")
+print(f"Final HS News Times template image created: {OUTPUT}")
