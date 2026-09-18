@@ -44,9 +44,14 @@ HINDI_BOLD = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
 ENGLISH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 ENGLISH_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-
-def font(path, size):
-    return ImageFont.truetype(path, size)
+for path, label in (
+    (HINDI, "Hindi regular font"),
+    (HINDI_BOLD, "Hindi bold font"),
+    (ENGLISH, "English regular font"),
+    (ENGLISH_BOLD, "English bold font"),
+):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"{label} not found: {path}")
 
 
 WHITE = (255, 255, 255)
@@ -55,6 +60,10 @@ RED = (218, 20, 28)
 BLUE = (10, 48, 125)
 LIGHT_BLUE = (205, 220, 238)
 SOURCE = (95, 120, 155)
+
+
+def font(path, size):
+    return ImageFont.truetype(path, size)
 
 
 def is_hindi(char):
@@ -165,10 +174,10 @@ def shorten(text, size, max_width, bold=True):
 
 
 # Header
-# Use the supplied HS News Times header artwork.
-HEADER_IMAGE = "hs_news_header.png"
+# Use the supplied HS News Times header artwork directly from its WebP file.
+HEADER_IMAGE = "hs_news_header.webp"
 if not os.path.exists(HEADER_IMAGE):
-    raise FileNotFoundError(f"Header image not found: {HEADER_IMAGE}. The workflow converts hs_news_header.webp to PNG before running.")
+    raise FileNotFoundError(f"Header image not found: {HEADER_IMAGE}")
 header = Image.open(HEADER_IMAGE).convert("RGB")
 header = header.resize((WIDTH, 283), Image.Resampling.LANCZOS)
 canvas.paste(header, (0, 0))
