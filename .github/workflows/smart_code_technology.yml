@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install packages
-        run: pip install feedparser Pillow
+        run: pip install feedparser Pillow requests
       - name: Post latest technology
         env:
           FB_PAGE_ID: "207734556102633"
