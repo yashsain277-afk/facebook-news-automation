@@ -55,11 +55,17 @@ draw = ImageDraw.Draw(canvas)
 
 HINDI = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
 HINDI_BOLD = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
+LATIN = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+LATIN_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-if not os.path.exists(HINDI):
-    raise FileNotFoundError(f"Hindi font not found: {HINDI}")
-if not os.path.exists(HINDI_BOLD):
-    raise FileNotFoundError(f"Hindi bold font not found: {HINDI_BOLD}")
+for path, label in (
+    (HINDI, "Hindi regular font"),
+    (HINDI_BOLD, "Hindi bold font"),
+    (LATIN, "Latin regular font"),
+    (LATIN_BOLD, "Latin bold font"),
+):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"{label} not found: {path}")
 
 WHITE = (255, 255, 255)
 BLACK = (15, 25, 45)
@@ -69,13 +75,54 @@ GREY = (95, 105, 120)
 LIGHT = (238, 242, 248)
 
 
-def font(size, bold=False):
-    return ImageFont.truetype(HINDI_BOLD if bold else HINDI, size)
+def font(size, bold=False, hindi=False):
+    if hindi:
+        return ImageFont.truetype(HINDI_BOLD if bold else HINDI, size)
+    return ImageFont.truetype(LATIN_BOLD if bold else LATIN, size)
 
 
-def text_width(text, size, bold=False):
-    box = draw.textbbox((0, 0), text, font=font(size, bold))
-    return box[2] - box[0]
+def is_hindi_char(ch):
+    return 0x0900 <= ord(ch) <= 0x097F
+
+
+def text_runs(text):
+    """Split text into Devanagari and non-Devanagari runs."""
+    if not text:
+        return []
+
+    runs = []
+    current = text[0]
+    current_hindi = is_hindi_char(text[0])
+
+    for ch in text[1:]:
+        ch_hindi = is_hindi_char(ch)
+        if ch_hindi == current_hindi:
+            current += ch
+        else:
+            runs.append((current, current_hindi))
+            current = ch
+            current_hindi = ch_hindi
+
+    runs.append((current, current_hindi))
+    return runs
+
+
+def mixed_text_width(text, size, bold=False):
+    total = 0
+    for run, hindi in text_runs(text):
+        box = draw.textbbox((0, 0), run, font=font(size, bold, hindi))
+        total += box[2] - box[0]
+    return total
+
+
+def draw_mixed_text(text, x, y, size, fill, bold=False):
+    cursor_x = x
+    for run, hindi in text_runs(text):
+        fnt = font(size, bold, hindi)
+        draw.text((cursor_x, y), run, fill=fill, font=fnt)
+        box = draw.textbbox((cursor_x, y), run, font=fnt)
+        cursor_x = box[2]
+    return cursor_x
 
 
 def wrap(text, size, max_width, max_lines=7):
@@ -85,7 +132,7 @@ def wrap(text, size, max_width, max_lines=7):
 
     for word in words:
         test = word if not current else current + " " + word
-        if text_width(test, size, True) <= max_width:
+        if mixed_text_width(test, size, True) <= max_width:
             current = test
         else:
             if current:
@@ -100,15 +147,15 @@ def wrap(text, size, max_width, max_lines=7):
 
     lines = lines[:max_lines]
     last = lines[-1]
-    while text_width(last + "...", size, True) > max_width and len(last) > 4:
+    while mixed_text_width(last + "...", size, True) > max_width and len(last) > 4:
         last = last[:-1]
     lines[-1] = last.rstrip() + "..."
     return lines
 
 
 def centered_text(text, y, size, fill, bold=False):
-    w = text_width(text, size, bold)
-    draw.text((WIDTH // 2 - w // 2, y), text, fill=fill, font=font(size, bold))
+    w = mixed_text_width(text, size, bold)
+    draw_mixed_text(text, WIDTH // 2 - w // 2, y, size, fill, bold)
 
 
 # ---------------- Header ----------------
@@ -173,12 +220,14 @@ headline_height = len(lines) * line_height
 start_y = 570
 
 for i, line in enumerate(lines):
-    w = text_width(line, size, True)
-    draw.text(
-        (WIDTH // 2 - w // 2, start_y + i * line_height),
+    w = mixed_text_width(line, size, True)
+    draw_mixed_text(
         line,
-        fill=BLACK,
-        font=font(size, True),
+        WIDTH // 2 - w // 2,
+        start_y + i * line_height,
+        size,
+        BLACK,
+        True,
     )
 
 # ---------------- Source ----------------
@@ -191,7 +240,7 @@ draw.line(
 
 if source:
     source_text = "स्रोत: " + source
-    while text_width(source_text, 32, False) > 850 and len(source) > 10:
+    while mixed_text_width(source_text, 32, False) > 850 and len(source) > 10:
         source = source[:-5].rstrip(" .") + "..."
         source_text = "स्रोत: " + source
     centered_text(source_text, source_y, 32, GREY, False)
@@ -209,7 +258,6 @@ centered_text("सच्ची खबर  |  हर समय  |  आपके �
 centered_text("#VeenaNews   #BreakingNews   #HindiNews", BOTTOM_TOP + 190, 24, WHITE, True)
 
 # Thin footer line
-
 draw.line(
     [(70, 1760), (WIDTH - 70, 1760)],
     fill=WHITE,
