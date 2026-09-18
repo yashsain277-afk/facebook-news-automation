@@ -17,45 +17,10 @@ MAX_CANDIDATES = 20
 # =========================================================
 
 FEEDS = {
-    "India": (
-        "https://news.google.com/rss/search?"
-        "q=India&hl=hi&gl=IN&ceid=IN:hi"
-    ),
-
-    "Rajasthan": (
-        "https://news.google.com/rss/search?"
-        "q=Rajasthan&hl=hi&gl=IN&ceid=IN:hi"
-    ),
-
-    "Kota": (
-        "https://news.google.com/rss/search?"
-        "q=Kota+Rajasthan&hl=hi&gl=IN&ceid=IN:hi"
-    ),
-
-    "Politics": (
-        "https://news.google.com/rss/search?"
-        "q=India+Politics&hl=hi&gl=IN&ceid=IN:hi"
-    ),
-
-    "Technology": (
-        "https://news.google.com/rss/search?"
-        "q=Technology+India&hl=hi&gl=IN&ceid=IN:hi"
-    ),
-
-    "Business": (
-        "https://news.google.com/rss/search?"
-        "q=Business+India&hl=hi&gl=IN&ceid=IN:hi"
-    ),
-
-    "Sports": (
-        "https://news.google.com/rss/search?"
-        "q=Sports+India&hl=hi&gl=IN&ceid=IN:hi"
-    ),
-
-    "Entertainment": (
-        "https://news.google.com/rss/search?"
-        "q=Bollywood+India&hl=hi&gl=IN&ceid=IN:hi"
-    ),
+    "Anta": "https://news.google.com/rss/search?q=Anta+Baran+Rajasthan&hl=hi&gl=IN&ceid=IN:hi",
+    "Baran": "https://news.google.com/rss/search?q=Baran+Rajasthan&hl=hi&gl=IN&ceid=IN:hi",
+    "Baran District": "https://news.google.com/rss/search?q=Baran+district+Rajasthan&hl=hi&gl=IN&ceid=IN:hi",
+    "Rajasthan Local": "https://news.google.com/rss/search?q=Rajasthan+local+news&hl=hi&gl=IN&ceid=IN:hi",
 }
 
 
@@ -395,86 +360,24 @@ def sort_by_date(
 
 def get_post_window():
 
-    india_timezone = timezone(
-        timedelta(
-            hours=5,
-            minutes=30
-        )
-    )
+    india_timezone = timezone(timedelta(hours=5, minutes=30))
+    now = datetime.now(india_timezone)
 
-    now = datetime.now(
-        india_timezone
-    )
+    # Use the latest 6 hours so scheduled runs remain useful even if
+    # GitHub Actions starts a few minutes late.
+    window_name = "LOCAL"
+    start = now - timedelta(hours=6)
 
-    hour = now.hour
-
-
-    # Morning post
-    if 6 <= hour < 14:
-
-        window_name = "MORNING"
-
-        start = now.replace(
-            hour=18,
-            minute=0,
-            second=0,
-            microsecond=0
-        ) - timedelta(
-            days=1
-        )
-
-
-    # Evening post
-    elif 14 <= hour <= 23:
-
-        window_name = "EVENING"
-
-        start = now.replace(
-            hour=10,
-            minute=0,
-            second=0,
-            microsecond=0
-        )
-
-
-    # Manual testing
-    else:
-
-        window_name = "TEST"
-
-        start = now - timedelta(
-            hours=12
-        )
-
-
-    print(
-        f"\nPost window: "
-        f"{window_name}"
-    )
-
-    print(
-        "Window start:",
-        start.strftime(
-            "%Y-%m-%d %H:%M"
-        )
-    )
-
-    print(
-        "Window end:",
-        now.strftime(
-            "%Y-%m-%d %H:%M"
-        )
-    )
+    print(f"\nPost window: {window_name}")
+    print("Window start:", start.strftime("%Y-%m-%d %H:%M"))
+    print("Window end:", now.strftime("%Y-%m-%d %H:%M"))
 
     return (
-        start.astimezone(
-            timezone.utc
-        ),
-        now.astimezone(
-            timezone.utc
-        ),
+        start.astimezone(timezone.utc),
+        now.astimezone(timezone.utc),
         window_name
     )
+
 
 
 # =========================================================
@@ -573,78 +476,42 @@ def select_topics(
 
 
     # -----------------------------------------------------
-    # Category diversity
-    #
-    # एक ही category की सारी headlines
-    # लगातार आने से रोकना
+    # Local priority: Anta first, then Baran, then Rajasthan.
     # -----------------------------------------------------
+    priority = {
+        "Anta": 0,
+        "Baran": 1,
+        "Baran District": 1,
+        "Rajasthan Local": 2,
+    }
 
     selected = []
+    used_links = set()
 
-    category_count = {}
+    # Prefer one fresh story from each local area, then fill with
+    # the newest remaining local stories.
+    for category in ("Anta", "Baran", "Baran District", "Rajasthan Local"):
+        for item in fresh_news:
+            if item["category"] == category and item["link"] not in used_links:
+                selected.append(item)
+                used_links.add(item["link"])
+                break
 
-
-    # पहले हर category से limited news
     for item in fresh_news:
-
-        category = item.get(
-            "category",
-            "Other"
-        )
-
-        current_count = category_count.get(
-            category,
-            0
-        )
-
-
-        if current_count >= 4:
+        if item["link"] in used_links:
             continue
-
-
-        selected.append(
-            item
-        )
-
-        category_count[
-            category
-        ] = current_count + 1
-
-
+        selected.append(item)
+        used_links.add(item["link"])
         if len(selected) >= count:
             break
 
-
-    # -----------------------------------------------------
-    # अगर count पूरा नहीं हुआ
-    # remaining latest news जोड़ें
-    # -----------------------------------------------------
-
-    if len(selected) < count:
-
-        selected_links = {
-            item["link"]
-            for item in selected
-        }
-
-
-        for item in fresh_news:
-
-            if item["link"] in selected_links:
-                continue
-
-
-            selected.append(
-                item
-            )
-
-            selected_links.add(
-                item["link"]
-            )
-
-
-            if len(selected) >= count:
-                break
+    selected = sorted(
+        selected,
+        key=lambda item: (
+            priority.get(item.get("category", "Rajasthan Local"), 9),
+            -item.get("published", datetime.min.replace(tzinfo=timezone.utc)).timestamp()
+        )
+    )
 
 
     print(
