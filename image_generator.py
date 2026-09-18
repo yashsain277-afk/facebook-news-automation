@@ -175,7 +175,7 @@ def shorten(text, size, max_width, bold=True):
 
 def centered_text(text, y, size, fill, bold=False):
     width = mixed_text_width(text, size, bold)
-    draw_mixed_text((WIDTH - width) // 2, y, text, size, fill, bold)
+    draw_mixed_text(((WIDTH - width) // 2, y), text, size, fill, bold)
 
 
 # Header: render directly with installed fonts.
