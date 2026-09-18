@@ -1,0 +1,46 @@
+name: आदि शक्ति - Daily 2 Devotional Posts
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 1 * * *"   # 7:00 AM IST
+    - cron: "30 13 * * *"  # 7:00 PM IST
+
+permissions:
+  contents: write
+
+jobs:
+  post-adi-shakti:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Hindi font
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-core fonts-noto-extra
+
+      - name: Install Python package
+        run: pip install Pillow
+
+      - name: Post devotional story
+        env:
+          FB_PAGE_ID: "337468333426210"
+          FB_PAGE_ACCESS_TOKEN: ${{ secrets.ADI_SHAKTI_PAGE_ACCESS_TOKEN }}
+          POSTED_FILE: adi_shakti_posted.json
+          PAGE_NAME: "आदि शक्ति"
+        run: python adi_shakti_post.py
+
+      - name: Save posted story
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add adi_shakti_posted.json
+          git diff --cached --quiet || git commit -m "Update Adi Shakti posted stories"
+          git push
