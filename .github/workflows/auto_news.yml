@@ -1,10 +1,13 @@
-name: Auto News Post
+name: Veena News - Local Every 4 Hours
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 4 * * *"
-    - cron: "30 12 * * *"
+    - cron: "30 0 * * *"   # 6:00 AM IST
+    - cron: "30 4 * * *"   # 10:00 AM IST
+    - cron: "30 8 * * *"   # 2:00 PM IST
+    - cron: "30 12 * * *"  # 6:00 PM IST
+    - cron: "30 16 * * *"  # 10:00 PM IST
 
 permissions:
   contents: write
