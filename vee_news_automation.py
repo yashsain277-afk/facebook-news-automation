@@ -122,32 +122,33 @@ def font(path,size): return ImageFont.truetype(path,size)
 def safe_text(text):
     return re.sub(r"[^\u0900-\u097F A-Za-z0-9.,!?;:'\"()/#%&+\-–—₹|]"," ",str(text))
 
+def text_font(size,bold=False):
+    # Render the complete string with a Devanagari-capable font so Hindi
+    # combining marks are shaped correctly. Per-character rendering breaks
+    # Devanagari matras and creates the dotted/garbled appearance.
+    return font(HINDI_BOLD if bold else HINDI,size)
+
 def mixed_width(draw,text,size,bold=False):
-    hf,ef=font(HINDI_BOLD if bold else HINDI,size),font(ENG_BOLD if bold else ENG,size)
-    total=0
-    for c in safe_text(text):
-        f=hf if "\u0900"<=c<="\u097F" else ef
-        b=draw.textbbox((0,0),c,font=f); total += b[2]-b[0]
-    return total
+    f=text_font(size,bold)
+    b=draw.textbbox((0,0),safe_text(text),font=f)
+    return b[2]-b[0]
 
 def draw_mixed(draw,xy,text,size,fill,bold=False):
-    x,y=xy
-    hf,ef=font(HINDI_BOLD if bold else HINDI,size),font(ENG_BOLD if bold else ENG,size)
-    for c in safe_text(text):
-        f=hf if "\u0900"<=c<="\u097F" else ef
-        draw.text((x,y),c,font=f,fill=fill)
-        x=draw.textbbox((x,y),c,font=f)[2]
+    f=text_font(size,bold)
+    draw.text(xy,safe_text(text),font=f,fill=fill)
 
 def wrap_mixed(draw,text,size,max_width,bold=False,max_lines=3):
     words=safe_text(text).split(); lines=[]; cur=""
     for word in words:
         test=word if not cur else cur+" "+word
-        if mixed_width(draw,test,size,bold)<=max_width: cur=test
+        if mixed_width(draw,test,size,bold)<=max_width:
+            cur=test
         else:
             if cur: lines.append(cur)
             cur=word
-            if len(lines)>=max_lines-1: break
-    if cur: lines.append(cur)
+            if len(lines)>=max_lines:
+                break
+    if cur and len(lines)<max_lines: lines.append(cur)
     return lines[:max_lines]
 
 def create_image(item):
