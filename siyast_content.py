@@ -69,21 +69,17 @@ caption=(f"📰 सियासत | {title}\n\n{text}\n\n"
          f"#Siyasat #IndianPolitics #Bharat #IndianDemocracy #PoliticalNews")
 
 
-# Permanent 1200x800 visual template.
-# The layout and leader portraits stay the same on every post; only the headline changes.
-LEADERS = [
-    ("नरेंद्र मोदी", "BJP", "https://commons.wikimedia.org/wiki/Special:Redirect/file/Official_portrait_of_prime_minister_of_India,_Narendra_Modi.jpg"),
-    ("राहुल गांधी", "INC", "https://commons.wikimedia.org/wiki/Special:Redirect/file/Rahul_Gandhi.jpg"),
-    ("अमित शाह", "BJP", "https://commons.wikimedia.org/wiki/Special:Redirect/file/Sh_Amit_Shah.jpg"),
-    ("मल्लिकार्जुन खड़गे", "INC", "https://commons.wikimedia.org/wiki/Special:Redirect/file/Mallikarjun_Kharge.jpg"),
-]
+
+# Use the single saved Siyasat template image on every post.
+# No leader photos are downloaded and no new base image is generated.
+TEMPLATE_FILE = "siyast_template.jpg"
 
 W, H = 1200, 800
-BG = (12, 16, 27)
-PANEL = (28, 34, 49)
-WHITE = (248, 249, 252)
-MUTED = (190, 197, 210)
-ACCENT = (225, 173, 62)
+im = Image.open(TEMPLATE_FILE).convert("RGB")
+
+# Replace only the headline area of the saved template.
+# The permanent faces, Parliament, party symbols, branding and overall design remain unchanged.
+d = ImageDraw.Draw(im)
 
 font_bold = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
 font_reg = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
@@ -94,95 +90,40 @@ def fit_font(path, size):
     except Exception:
         return ImageFont.truetype(font_bold, size)
 
-fb = fit_font(font_bold, 50)
-fsub = fit_font(font_reg, 24)
-fheadline = fit_font(font_bold, 42)
-fname = fit_font(font_bold, 22)
-fparty = fit_font(font_reg, 20)
-fyear = fit_font(font_bold, 34)
+f_head = fit_font(font_bold, 38)
+f_sub = fit_font(font_bold, 27)
 
-def download_image(url, filename):
-    try:
-        rr = requests.get(
-            url,
-            timeout=30,
-            headers={"User-Agent": "SiyasatNewsBot/1.0"},
-            allow_redirects=True
-        )
-        rr.raise_for_status()
-        with open(filename, "wb") as fh:
-            fh.write(rr.content)
-        return Image.open(filename).convert("RGB")
-    except Exception as ex:
-        print("Leader image download failed:", url, ex)
-        return None
-
-def cover_crop(src, size):
-    tw, th = size
-    src = src.copy()
-    scale = max(tw / src.width, th / src.height)
-    nw, nh = int(src.width * scale), int(src.height * scale)
-    src = src.resize((nw, nh), Image.LANCZOS)
-    left = max(0, (nw - tw) // 2)
-    top = max(0, (nh - th) // 2)
-    return src.crop((left, top, left + tw, top + th))
-
-im = Image.new("RGB", (W, H), BG)
-d = ImageDraw.Draw(im)
-
-# Header
-d.rectangle((0, 0, W, 112), fill=(9, 13, 22))
-d.text((38, 18), "सियासत", font=fb, fill=WHITE)
-d.text((40, 73), "भारतीय राजनीति • समाचार • इतिहास • संदर्भ", font=fsub, fill=MUTED)
-d.text((1060, 25), "2029", font=fyear, fill=WHITE)
-
-# Headline panel
-d.rounded_rectangle((30, 132, W - 30, 430), radius=24, fill=PANEL)
-d.rectangle((30, 132, 48, 430), fill=ACCENT)
+# Right-side headline block in the saved 1200x800 template.
+# Cover the old baked-in headline, then redraw the new headline in the same style.
+d.rectangle((690, 382, 1190, 585), fill=(248, 248, 245))
+d.rectangle((690, 475, 1190, 558), fill=(215, 30, 30))
+d.rectangle((690, 558, 1190, 620), fill=(242, 195, 0))
 
 headline = re.sub(r"\s+", " ", title).strip()
 headline_lines = textwrap.wrap(
     headline,
-    width=43,
+    width=24,
     break_long_words=False,
     break_on_hyphens=False
-)[:5]
+)[:4]
 
-line_height = 55
-total_h = len(headline_lines) * line_height
-start_y = 280 - total_h // 2
+# First line(s) on white band.
+y = 397
+for line in headline_lines[:2]:
+    d.text((710, y), line, font=f_head, fill=(10, 10, 10))
+    y += 42
 
-for i, line in enumerate(headline_lines):
-    d.text((72, start_y + i * line_height), line, font=fheadline, fill=WHITE)
+# If the title needs more lines, put the remaining short portion on the red band.
+remaining = headline_lines[2:]
+if remaining:
+    y = 483
+    for line in remaining[:2]:
+        d.text((710, y), line, font=f_head, fill=(255, 255, 255))
+        y += 42
 
-# Fixed leader strip
-card_y = 458
-card_h = 300
-gap = 18
-card_w = (W - 60 - gap * 3) // 4
+d.text((715, 570), "सियासत • ताज़ा राजनीतिक अपडेट", font=f_sub, fill=(20, 20, 20))
 
-for i, (name, party, url) in enumerate(LEADERS):
-    x = 30 + i * (card_w + gap)
-    d.rounded_rectangle((x, card_y, x + card_w, card_y + card_h), radius=18, fill=(20, 25, 38))
-
-    portrait = download_image(url, f"leader_{i}.jpg")
-    if portrait:
-        portrait = cover_crop(portrait, (card_w - 20, 205))
-        im.paste(portrait, (x + 10, card_y + 10))
-        d = ImageDraw.Draw(im)
-    else:
-        d.rectangle((x + 10, card_y + 10, x + card_w - 10, card_y + 215), fill=(45, 50, 65))
-        d.text((x + 25, card_y + 90), name, font=fparty, fill=MUTED)
-
-    d.text((x + 14, card_y + 225), name, font=fname, fill=WHITE)
-    pill_w = 62
-    d.rounded_rectangle((x + 14, card_y + 258, x + 14 + pill_w, card_y + 286), radius=10, fill=(235, 235, 235))
-    d.text((x + 27, card_y + 261), party, font=fparty, fill=(20, 24, 32))
-
-# Footer
-d.text((930, 768), "तथ्य • इतिहास • संदर्भ", font=fparty, fill=MUTED)
-
-im.save("siyast_post.jpg", quality=92)
+im.save("siyast_post.jpg", quality=92, optimize=True)
 
 with open("siyast_post.jpg", "rb") as f:
     r = requests.post(
@@ -195,4 +136,9 @@ print("Facebook:", r.status_code, r.text)
 r.raise_for_status()
 
 posted.append(title)
-json.dump(posted[-300:], open(POSTED_FILE, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+json.dump(
+    posted[-300:],
+    open(POSTED_FILE, "w", encoding="utf-8"),
+    ensure_ascii=False,
+    indent=2
+)
