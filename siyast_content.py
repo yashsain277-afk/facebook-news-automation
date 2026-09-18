@@ -68,86 +68,131 @@ caption=(f"📰 सियासत | {title}\n\n{text}\n\n"
          f"🔗 मूल समाचार: {link}\n\n"
          f"#Siyasat #IndianPolitics #Bharat #IndianDemocracy #PoliticalNews")
 
-# Find a relevant Wikimedia Commons image of the named politician or party.
-people = [
-    ("Narendra Modi", ["modi", "narendra modi", "प्रधानमंत्री"]),
-    ("Rahul Gandhi", ["rahul gandhi", "राहुल गांधी"]),
-    ("Amit Shah", ["amit shah", "अमित शाह"]),
-    ("Sonia Gandhi", ["sonia gandhi", "सोनिया गांधी"]),
-    ("Mallikarjun Kharge", ["mallikarjun kharge", "खड़गे"]),
-    ("Arvind Kejriwal", ["arvind kejriwal", "केजरीवाल"]),
-    ("Mamata Banerjee", ["mamata banerjee", "ममता बनर्जी"]),
-    ("Yogi Adityanath", ["yogi adityanath", "योगी आदित्यनाथ"]),
-    ("Nirmala Sitharaman", ["nirmala sitharaman", "निर्मला सीतारमण"]),
-    ("Rajnath Singh", ["rajnath singh", "राजनाथ सिंह"]),
-    ("Akhilesh Yadav", ["akhilesh yadav", "अखिलेश यादव"]),
-    ("Nitish Kumar", ["nitish kumar", "नीतीश कुमार"]),
-    ("Nayab Singh Saini", ["nayab singh saini", "nayab saini", "नायब सिंह सैनी"]),
-    ("S Jaishankar", ["s jaishankar", "jaishankar", "जयशंकर"]),
+
+# Permanent 1200x800 visual template.
+# The layout and leader portraits stay the same on every post; only the headline changes.
+LEADERS = [
+    ("नरेंद्र मोदी", "BJP", "https://commons.wikimedia.org/wiki/Special:Redirect/file/Official_portrait_of_prime_minister_of_India,_Narendra_Modi.jpg"),
+    ("राहुल गांधी", "INC", "https://commons.wikimedia.org/wiki/Special:Redirect/file/Rahul_Gandhi.jpg"),
+    ("अमित शाह", "BJP", "https://commons.wikimedia.org/wiki/Special:Redirect/file/Sh_Amit_Shah.jpg"),
+    ("मल्लिकार्जुन खड़गे", "INC", "https://commons.wikimedia.org/wiki/Special:Redirect/file/Mallikarjun_Kharge.jpg"),
 ]
-low = title.lower()
-person = next((name for name, terms in people if any(term in low for term in terms)), None)
 
-def commons_image(search_term):
+W, H = 1200, 800
+BG = (12, 16, 27)
+PANEL = (28, 34, 49)
+WHITE = (248, 249, 252)
+MUTED = (190, 197, 210)
+ACCENT = (225, 173, 62)
+
+font_bold = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
+font_reg = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
+
+def fit_font(path, size):
     try:
-        params = {
-            "action":"query","generator":"search","gsrsearch":search_term,
-            "gsrnamespace":6,"gsrlimit":10,"prop":"imageinfo",
-            "iiprop":"url","iiurlwidth":1200,"format":"json"
-        }
-        data=requests.get("https://commons.wikimedia.org/w/api.php",params=params,timeout=20).json()
-        for p in data.get("query",{}).get("pages",{}).values():
-            info=(p.get("imageinfo") or [{}])[0]
-            u=info.get("thumburl") or info.get("url")
-            if u and u.lower().split("?")[0].endswith((".jpg",".jpeg",".png",".webp")):
-                return u
-    except Exception as ex:
-        print("Wikimedia search failed:", ex)
-    return None
-
-img_url = commons_image(person) if person else commons_image(title[:120])
-if not img_url and news_image_url:
-    img_url = news_image_url
-
-W,H=1200,800
-if img_url:
-    try:
-        raw=requests.get(img_url,timeout=30).content
-        open("siyast_source.jpg","wb").write(raw)
-        im=Image.open("siyast_source.jpg").convert("RGB")
-        im.thumbnail((W,H))
-        canvas=Image.new("RGB",(W,H),(20,24,35))
-        x=(W-im.width)//2; y=(H-im.height)//2
-        canvas.paste(im,(x,y))
-        im=canvas
+        return ImageFont.truetype(path, size)
     except Exception:
-        im=Image.new("RGB",(W,H),(20,24,35))
-else:
-    im=Image.new("RGB",(W,H),(20,24,35))
+        return ImageFont.truetype(font_bold, size)
 
-d=ImageDraw.Draw(im)
-font="/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
-reg="/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
-fb=ImageFont.truetype(font,52)
-fr=ImageFont.truetype(reg,30)
-d.rectangle((0,0,W,105),fill=(12,16,25))
-d.text((45,22),"सियासत",font=fb,fill=(245,245,245))
-d.rectangle((0,665,W,800),fill=(12,16,25))
-label = "ताज़ा भारतीय राजनीतिक अपडेट"
-d.text((45,685),label,font=fr,fill=(245,245,245))
-if person:
-    d.text((45,735),person,font=fr,fill=(220,225,235))
-else:
-    d.text((45,735),"तथ्य • इतिहास • संदर्भ",font=fr,fill=(220,225,235))
+fb = fit_font(font_bold, 50)
+fsub = fit_font(font_reg, 24)
+fheadline = fit_font(font_bold, 42)
+fname = fit_font(font_bold, 22)
+fparty = fit_font(font_reg, 20)
+fyear = fit_font(font_bold, 34)
+
+def download_image(url, filename):
+    try:
+        rr = requests.get(
+            url,
+            timeout=30,
+            headers={"User-Agent": "SiyasatNewsBot/1.0"},
+            allow_redirects=True
+        )
+        rr.raise_for_status()
+        with open(filename, "wb") as fh:
+            fh.write(rr.content)
+        return Image.open(filename).convert("RGB")
+    except Exception as ex:
+        print("Leader image download failed:", url, ex)
+        return None
+
+def cover_crop(src, size):
+    tw, th = size
+    src = src.copy()
+    scale = max(tw / src.width, th / src.height)
+    nw, nh = int(src.width * scale), int(src.height * scale)
+    src = src.resize((nw, nh), Image.LANCZOS)
+    left = max(0, (nw - tw) // 2)
+    top = max(0, (nh - th) // 2)
+    return src.crop((left, top, left + tw, top + th))
+
+im = Image.new("RGB", (W, H), BG)
+d = ImageDraw.Draw(im)
+
+# Header
+d.rectangle((0, 0, W, 112), fill=(9, 13, 22))
+d.text((38, 18), "सियासत", font=fb, fill=WHITE)
+d.text((40, 73), "भारतीय राजनीति • समाचार • इतिहास • संदर्भ", font=fsub, fill=MUTED)
+d.text((1060, 25), "2029", font=fyear, fill=WHITE)
+
+# Headline panel
+d.rounded_rectangle((30, 132, W - 30, 430), radius=24, fill=PANEL)
+d.rectangle((30, 132, 48, 430), fill=ACCENT)
+
+headline = re.sub(r"\s+", " ", title).strip()
+headline_lines = textwrap.wrap(
+    headline,
+    width=43,
+    break_long_words=False,
+    break_on_hyphens=False
+)[:5]
+
+line_height = 55
+total_h = len(headline_lines) * line_height
+start_y = 280 - total_h // 2
+
+for i, line in enumerate(headline_lines):
+    d.text((72, start_y + i * line_height), line, font=fheadline, fill=WHITE)
+
+# Fixed leader strip
+card_y = 458
+card_h = 300
+gap = 18
+card_w = (W - 60 - gap * 3) // 4
+
+for i, (name, party, url) in enumerate(LEADERS):
+    x = 30 + i * (card_w + gap)
+    d.rounded_rectangle((x, card_y, x + card_w, card_y + card_h), radius=18, fill=(20, 25, 38))
+
+    portrait = download_image(url, f"leader_{i}.jpg")
+    if portrait:
+        portrait = cover_crop(portrait, (card_w - 20, 205))
+        im.paste(portrait, (x + 10, card_y + 10))
+        d = ImageDraw.Draw(im)
+    else:
+        d.rectangle((x + 10, card_y + 10, x + card_w - 10, card_y + 215), fill=(45, 50, 65))
+        d.text((x + 25, card_y + 90), name, font=fparty, fill=MUTED)
+
+    d.text((x + 14, card_y + 225), name, font=fname, fill=WHITE)
+    pill_w = 62
+    d.rounded_rectangle((x + 14, card_y + 258, x + 14 + pill_w, card_y + 286), radius=10, fill=(235, 235, 235))
+    d.text((x + 27, card_y + 261), party, font=fparty, fill=(20, 24, 32))
+
+# Footer
+d.text((930, 768), "तथ्य • इतिहास • संदर्भ", font=fparty, fill=MUTED)
 
 im.save("siyast_post.jpg", quality=92)
 
-with open("siyast_post.jpg","rb") as f:
-    r=requests.post(f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos",
-        data={"caption":caption,"access_token":TOKEN},
-        files={"source":("siyast_post.jpg",f,"image/jpeg")},timeout=90)
-print("Facebook:",r.status_code,r.text)
+with open("siyast_post.jpg", "rb") as f:
+    r = requests.post(
+        f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos",
+        data={"caption": caption, "access_token": TOKEN},
+        files={"source": ("siyast_post.jpg", f, "image/jpeg")},
+        timeout=90
+    )
+print("Facebook:", r.status_code, r.text)
 r.raise_for_status()
 
 posted.append(title)
-json.dump(posted[-300:],open(POSTED_FILE,"w",encoding="utf-8"),ensure_ascii=False,indent=2)
+json.dump(posted[-300:], open(POSTED_FILE, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
