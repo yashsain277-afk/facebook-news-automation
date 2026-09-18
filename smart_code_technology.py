@@ -67,39 +67,25 @@ for ln in lines[:3]:
     d.text((110,y),ln,font=fr,fill=(220,225,235)); y+=48
 im.save("smart_code_technology.jpg",quality=94)
 
-boundary = uuid.uuid4().hex
-data = open("smart_code_technology.jpg", "rb").read()
+import requests
 
-def form_field(name, value):
-    return (
-        f"--{boundary}\r\n"
-        f"Content-Disposition: form-data; name="{name}"\r\n\r\n"
-        f"{value}\r\n"
-    ).encode("utf-8")
+with open("smart_code_technology.jpg", "rb") as image_file:
+    response = requests.post(
+        f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos",
+        data={
+            "caption": caption,
+            "access_token": TOKEN,
+        },
+        files={
+            "source": ("smart_code_technology.jpg", image_file, "image/jpeg")
+        },
+        timeout=60,
+    )
 
-header = (
-    f"--{boundary}\r\n"
-    f"Content-Disposition: form-data; name="source"; filename="smart_code_technology.jpg"\r\n"
-    f"Content-Type: image/jpeg\r\n\r\n"
-).encode("utf-8")
+print("Facebook status:", response.status_code)
+print("Facebook response:", response.text)
 
-body = (
-    form_field("caption", caption)
-    + form_field("access_token", TOKEN)
-    + header
-    + data
-    + f"\r\n--{boundary}--\r\n".encode("utf-8")
-)
-
-req = urllib.request.Request(
-    f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos",
-    data=body,
-    headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
-    method="POST",
-)
-
-with urllib.request.urlopen(req, timeout=60) as r:
-    print("Facebook post:", r.read().decode())
+response.raise_for_status()
 
 posted.append(title)
 with open(POSTED_FILE, "w", encoding="utf-8") as f:
