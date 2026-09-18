@@ -98,18 +98,25 @@ def choose_topic(all_items, state):
     if not pool: pool = [x for x in all_items if x["link"] not in recent]
     return sorted(pool,key=lambda x:x["published"],reverse=True)[0] if pool else None
 
+def simple_title(item):
+    # Keep the original headline; do not machine-translate words.
+    title=clean_html(item.get("title",""))
+    title=re.sub(r"\s+-\s+[^-]+$","",title).strip(" -:|")
+    return " ".join(title.split()[:14])
+
+def simple_summary(item):
+    if item["kind"]=="cricket":
+        return "टीम इंडिया और क्रिकेट से जुड़ी यह ताजा खबर है। Vee News इस खबर पर नजर रख रहा है। नई जानकारी मिलने पर अपडेट किया जाएगा।"
+    return "यह देश से जुड़ी ताजा प्रमुख खबर है। Vee News इस खबर पर नजर रख रहा है। नई जानकारी मिलने पर अपडेट किया जाएगा।"
+
 def build_description(item):
-    summary = item["summary"]
-    if len(summary) < 80:
-        summary = f'{item["title"]}. इस खबर से जुड़ी ताजा जानकारी उपलब्ध होते ही अपडेट की जाएगी।'
+    title=simple_title(item)
     return (
-        f'📰 Vee News Update\n\n{item["title"]}\n\n'
-        f'क्या हुआ?\n{summary}\n\n'
-        f'क्यों महत्वपूर्ण है?\nयह खबर अभी चर्चा में है और इससे जुड़ी ताजा जानकारी पर नजर रखी जा रही है। '
-        f'उपलब्ध जानकारी के अनुसार ऊपर दी गई रिपोर्ट इस समय की प्रमुख अपडेट है।\n\n'
-        f'अभी की स्थिति\nनई और सत्यापित जानकारी मिलने पर Vee News इस अपडेट को आगे भी अपडेट करेगा।\n\n'
-        f'स्रोत: {item["source"]}\nVee News | Contact: {PHONE}\n\n'
-        f'#VeeNews #IndianCricket #TeamIndia #CricketNews #HindiNews'
+        f"📰 Vee News Update\n\n{title}\n\n"
+        f"क्या हुआ?\n{simple_summary(item)}\n\n"
+        f"क्यों महत्वपूर्ण है?\nयह अभी की प्रमुख अपडेट है। नई और सत्यापित जानकारी मिलने पर Vee News इसे अपडेट करेगा।\n\n"
+        f"स्रोत: {item['source']}\nVee News | Contact: {PHONE}\n\n"
+        f"#VeeNews #IndianCricket #TeamIndia #CricketNews #HindiNews"
     )
 
 HINDI="/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
@@ -202,7 +209,7 @@ def create_image(item):
     d.text((620,674),"NEWS",font=font(ENG_BOLD,60),fill=dark)
 
     d.rounded_rectangle([25,790,1055,1045],radius=20,fill=navy)
-    lines=wrap_mixed(d,item["title"],48,960,True,4); y=820
+    lines=wrap_mixed(d,simple_title(item),48,960,True,3); y=820
     for line in lines:
         draw_mixed(d,(55,y),line,48,white,True); y+=58
 
@@ -211,7 +218,7 @@ def create_image(item):
 
     d.rounded_rectangle([25,1095,1055,1585],radius=24,fill=light)
     draw_mixed(d,(60,1135),"क्या हुआ?",36,blue,True)
-    body_lines=wrap_mixed(d,item["summary"] or item["title"],28,930,False,7); y=1195
+    body_lines=wrap_mixed(d,simple_summary(item),28,930,False,4); y=1195
     for line in body_lines:
         draw_mixed(d,(60,y),line,28,dark,False); y+=47
     d.line([60,1480,1020,1480],fill=(200,214,235),width=2)
