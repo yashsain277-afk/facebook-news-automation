@@ -67,12 +67,40 @@ for ln in lines[:3]:
     d.text((110,y),ln,font=fr,fill=(220,225,235)); y+=48
 im.save("smart_code_technology.jpg",quality=94)
 
-boundary=uuid.uuid4().hex
-data=open("smart_code_technology.jpg","rb").read()
-body=(f"--{boundary}\r\nContent-Disposition: form-data; name=\\"caption\\"\r\n\r\n{caption}\r\n"
-      f"--{boundary}\r\nContent-Disposition: form-data; name=\\"access_token\\"\r\n\r\n{TOKEN}\r\n"
-      f"--{boundary}\r\nContent-Disposition: form-data; name=\\"source\\"; filename="smart_code_technology.jpg"\r\n"
-      f"Content-Type: image/jpeg\r\n\r\n").encode()+data+f"\r\n--{boundary}--\r\n".encode()
-req=urllib.request.Request(f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos",data=body,headers={"Content-Type":f"multipart/form-data; boundary={boundary}"},method="POST")
-with urllib.request.urlopen(req,timeout=60) as r: print("Facebook post:",r.read().decode())
-posted.append(title); json.dump(posted[-200:],open(POSTED_FILE,"w",encoding="utf-8"),ensure_ascii=False,indent=2)
+boundary = uuid.uuid4().hex
+data = open("smart_code_technology.jpg", "rb").read()
+
+def form_field(name, value):
+    return (
+        f"--{boundary}\r\n"
+        f"Content-Disposition: form-data; name="{name}"\r\n\r\n"
+        f"{value}\r\n"
+    ).encode("utf-8")
+
+header = (
+    f"--{boundary}\r\n"
+    f"Content-Disposition: form-data; name="source"; filename="smart_code_technology.jpg"\r\n"
+    f"Content-Type: image/jpeg\r\n\r\n"
+).encode("utf-8")
+
+body = (
+    form_field("caption", caption)
+    + form_field("access_token", TOKEN)
+    + header
+    + data
+    + f"\r\n--{boundary}--\r\n".encode("utf-8")
+)
+
+req = urllib.request.Request(
+    f"https://graph.facebook.com/v26.0/{PAGE_ID}/photos",
+    data=body,
+    headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    method="POST",
+)
+
+with urllib.request.urlopen(req, timeout=60) as r:
+    print("Facebook post:", r.read().decode())
+
+posted.append(title)
+with open(POSTED_FILE, "w", encoding="utf-8") as f:
+    json.dump(posted[-200:], f, ensure_ascii=False, indent=2)
