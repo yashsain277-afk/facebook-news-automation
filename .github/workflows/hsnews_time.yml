@@ -43,7 +43,7 @@ jobs:
 
       - name: Post to HSNews Time Facebook Page
         env:
-          FB_PAGE_ID: "361282040719868"
+          FB_PAGE_ID: "1391392690913401"
           FB_PAGE_ACCESS_TOKEN: ${{ secrets.HS_FB_PAGE_ACCESS_TOKEN }}
           POSTED_FILE: hs_posted_news.json
           PAGE_NAME: "HSNews Time"
