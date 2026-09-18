@@ -1,1 +1,15 @@
-PLACEHOLDER
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="377" viewBox="0 0 1600 377">
+<rect width="1600" height="377" fill="#06253a"/>
+<rect x="0" y="357" width="1600" height="20" fill="#ff1010"/>
+<rect x="78" y="34" width="276" height="276" rx="28" fill="#fff"/>
+<circle cx="216" cy="172" r="92" fill="#f5f5f5" stroke="#777" stroke-width="5"/>
+<path d="M150 135c28-30 75-42 116-17M145 170c42-18 96-14 141 14M151 208c38 24 82 29 116 13" fill="none" stroke="#333" stroke-width="12" opacity=".75"/>
+<path d="M115 207c19-57 35-82 66-101" fill="none" stroke="#159bd7" stroke-width="22" stroke-linecap="round"/>
+<path d="M112 217c-5 43 21 78 67 92" fill="none" stroke="#159bd7" stroke-width="22" stroke-linecap="round"/>
+<path d="M274 207c-3 44-29 76-70 91" fill="none" stroke="#159bd7" stroke-width="22" stroke-linecap="round"/>
+<rect x="169" y="145" width="96" height="88" rx="8" fill="#fff" stroke="#159bd7" stroke-width="7"/>
+<text x="217" y="207" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="58" font-weight="700" fill="#333">HS</text>
+<text x="505" y="245" font-family="DejaVu Sans, sans-serif" font-size="260" font-weight="700" fill="#fff200">HS</text>
+<text x="995" y="165" font-family="DejaVu Sans, sans-serif" font-size="105" fill="#fff">News</text>
+<text x="995" y="280" font-family="DejaVu Sans, sans-serif" font-size="105" fill="#fff">Times</text>
+</svg>
