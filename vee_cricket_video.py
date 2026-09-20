@@ -346,8 +346,9 @@ def make_frames(item):
     summary = translate_to_hindi(item["summary"]) if item["summary"] else "क्रिकेट से जुड़ी यह ताज़ा खबर चर्चा में है।"
 
     for i in range(3):
-        frame = bg.copy()
-        d = ImageDraw.Draw(frame, "RGBA")
+        frame = bg.copy().convert("RGBA")
+        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        d = ImageDraw.Draw(overlay, "RGBA")
         if bg.getbbox():
             # subtle dark gradient-like bands
             d.rectangle([0, 0, W, 220], fill=(5, 20, 55, 225))
@@ -402,7 +403,9 @@ def make_frames(item):
             d.text((55, 1765), "वी न्यूज़ को फॉलो करें", font=ImageFont.truetype(HINDI_BOLD, 38), fill=(255, 210, 0))
             d.text((55, 1845), datetime.now(IST).strftime("%d %b %Y | %H:%M IST"), font=ImageFont.truetype(ENG, 27), fill="white")
 
-        frame.save(os.path.join(WORK, f"frame{i}.jpg"), quality=94); overlay = frame.copy().convert("RGBA"); overlay.putalpha(255); overlay.save(os.path.join(WORK, f"overlay{i}.png"))
+        frame = Image.alpha_composite(frame, overlay).convert("RGB")
+        frame.save(os.path.join(WORK, f"frame{i}.jpg"), quality=94)
+        overlay.save(os.path.join(WORK, f"overlay{i}.png"))
 
 
 def make_voice(item):
