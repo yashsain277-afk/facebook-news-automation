@@ -515,6 +515,7 @@ def main():
     print("RSS/article image found:", bool(item["image"]))
     make_frames(item)
     make_voice(item)
+    video_source = find_cricket_video(item)
     make_video(video_source)
     print("VIDEO_CREATED:", OUT)
 
