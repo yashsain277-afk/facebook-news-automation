@@ -353,16 +353,43 @@ def make_frames(item):
 
 def make_voice(item):
     title_hi = translate_to_hindi(item["title"])
-    summary_hi = translate_to_hindi(item["summary"]) if item["summary"] else "इस खबर से जुड़ी ताज़ा जानकारी सामने आई है।"
-    script = (
-        "नमस्कार। वी न्यूज़ पर क्रिकेट की ताज़ा खबर। "
-        + title_hi + "। "
-        + summary_hi[:320]
-        + " अधिक अपडेट के लिए वी न्यूज़ को फॉलो करें।"
-    )
+    summary_hi = translate_to_hindi(item["summary"]) if item["summary"] else ""
+
+    # Make the narration sound like a short Hindi news bulletin, not a direct
+    # reading of the RSS headline/summary.
+    title_hi = re.sub(r"\\s+", " ", title_hi).strip(" ।|:-")
+    summary_hi = re.sub(r"\\s+", " ", summary_hi).strip(" ।|:-")
+
+    # Remove common article boilerplate and keep the useful part.
+    for phrase in (
+        "read more", "click here", "subscribe", "follow us",
+        "जानिए पूरी खबर", "और पढ़ें", "पढ़ें पूरी खबर"
+    ):
+        summary_hi = re.sub(re.escape(phrase), "", summary_hi, flags=re.I)
+    summary_hi = re.sub(r"\\s+", " ", summary_hi).strip(" ।|:-")
+
+    # Keep narration concise enough for a ~60-second reel.
+    if len(summary_hi) > 420:
+        summary_hi = summary_hi[:420].rsplit(" ", 1)[0] + "।"
+
+    parts = [
+        "नमस्कार। आप देख रहे हैं वी न्यूज़।",
+        "आज की बड़ी क्रिकेट खबर है।",
+        title_hi + "।",
+    ]
+    if summary_hi:
+        parts.append("मिली जानकारी के अनुसार, " + summary_hi + "।")
+    parts.extend([
+        "फिलहाल इस खबर से जुड़ा यही प्रमुख अपडेट सामने आया है।",
+        "ऐसी ही ताज़ा क्रिकेट खबरों के लिए वी न्यूज़ को फॉलो करें।"
+    ])
+    script = " ".join(parts)
+    script = re.sub(r"\\s+", " ", script).strip()
+
     with open(os.path.join(WORK, "script.txt"), "w", encoding="utf-8") as f:
         f.write(script)
     gTTS(text=script, lang="hi", slow=False).save(os.path.join(WORK, "voice.mp3"))
+    print("HINDI_NEWS_SCRIPT_OK:", script)
     print("HINDI_VOICE_OK")
 
 
