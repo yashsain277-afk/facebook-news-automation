@@ -118,6 +118,32 @@ def commons_image(query):
     return None
 
 
+def translate_to_hindi(text):
+    text = clean(text)
+    if not text:
+        return ""
+    try:
+        params = {
+            "client": "gtx",
+            "sl": "auto",
+            "tl": "hi",
+            "dt": "t",
+            "q": text[:1200],
+        }
+        url = "https://translate.googleapis.com/translate_a/single?" + urllib.parse.urlencode(params)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        translated = "".join(part[0] for part in data[0] if part and part[0])
+        translated = clean(translated)
+        if translated:
+            print("HINDI_TRANSLATION_OK")
+            return translated
+    except Exception as exc:
+        print("Hindi translation skipped:", exc)
+    return text
+
+
 def get_items():
     items = []
     for category, url in FEEDS.items():
@@ -262,8 +288,8 @@ def make_frames(item):
         # No generic Google image: use a clean cricket-themed background instead.
         bg = Image.new("RGB", (W, H), (8, 24, 65))
 
-    title = item["title"][:190]
-    summary = item["summary"] or "क्रिकेट से जुड़ी यह ताजा खबर चर्चा में है।"
+    title = translate_to_hindi(item["title"])[:190]
+    summary = translate_to_hindi(item["summary"]) if item["summary"] else "क्रिकेट से जुड़ी यह ताज़ा खबर चर्चा में है।"
 
     for i in range(3):
         frame = bg.copy()
@@ -326,10 +352,12 @@ def make_frames(item):
 
 
 def make_voice(item):
+    title_hi = translate_to_hindi(item["title"])
+    summary_hi = translate_to_hindi(item["summary"]) if item["summary"] else "इस खबर से जुड़ी ताज़ा जानकारी सामने आई है।"
     script = (
         "नमस्कार। वी न्यूज़ पर क्रिकेट की ताज़ा खबर। "
-        + item["title"] + "। "
-        + (item["summary"][:320] if item["summary"] else "इस खबर से जुड़ी ताज़ा जानकारी सामने आई है।")
+        + title_hi + "। "
+        + summary_hi[:320]
         + " अधिक अपडेट के लिए वी न्यूज़ को फॉलो करें।"
     )
     with open(os.path.join(WORK, "script.txt"), "w", encoding="utf-8") as f:
@@ -352,7 +380,8 @@ def make_video():
         "[v0][v1][v2]concat=n=3:v=1:a=0[v]",
         "-map", "[v]", "-map", "3:a",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "27",
-        "-c:a", "aac", "-b:a", "96k", "-pix_fmt", "yuv420p",
+        "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
+        "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p",
         "-shortest", "-movflags", "+faststart", OUT
     ]
     subprocess.run(cmd, check=True)
