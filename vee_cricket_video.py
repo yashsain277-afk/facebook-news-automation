@@ -85,6 +85,46 @@ def rss_image(entry):
     return ""
 
 
+def commons_video(query):
+    """Find a freely licensed video on Wikimedia Commons."""
+    try:
+        params = {
+            "action": "query",
+            "generator": "search",
+            "gsrsearch": query + " cricket",
+            "gsrnamespace": "6",
+            "gsrlimit": "10",
+            "prop": "imageinfo",
+            "iiprop": "url|mime|extmetadata",
+            "format": "json",
+        }
+        url = "https://commons.wikimedia.org/w/api.php?" + urllib.parse.urlencode(params)
+        req = urllib.request.Request(url, headers={"User-Agent": "VeeNewsZeroCostVideo/1.0"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        pages = list(data.get("query", {}).get("pages", {}).values())
+        for page in pages:
+            info = (page.get("imageinfo") or [{}])[0]
+            mime = str(info.get("mime", ""))
+            media_url = info.get("url", "")
+            if mime.startswith("video/") and media_url:
+                meta = info.get("extmetadata", {})
+                artist = clean(meta.get("Artist", {}).get("value", ""))
+                license_name = clean(meta.get("LicenseShortName", {}).get("value", ""))
+                page_url = "https://commons.wikimedia.org/wiki/" + urllib.parse.quote(str(page.get("title", "")).replace(" ", "_"))
+                print("COMMONS_VIDEO_OK:", page.get("title"), license_name)
+                return {
+                    "url": media_url,
+                    "title": page.get("title", ""),
+                    "credit": artist or "Wikimedia Commons",
+                    "license": license_name or "Commons license",
+                    "page_url": page_url,
+                }
+    except Exception as exc:
+        print("Commons video search skipped:", exc)
+    return None
+
+
 def commons_image(query):
     try:
         params = {
@@ -281,12 +321,26 @@ def make_base_photo(item):
     raise RuntimeError("No usable cricket photo could be downloaded.")
 
 
+def find_cricket_video(item):
+    for query in (item["title"], "India cricket", "cricket match"):
+        found = commons_video(query)
+        if found:
+            path = os.path.join(WORK, "source_cricket.webm")
+            try:
+                req = urllib.request.Request(found["url"], headers={"User-Agent": "VeeNewsZeroCostVideo/1.0"})
+                with urllib.request.urlopen(req, timeout=40) as r, open(path, "wb") as out:
+                    out.write(r.read(40 * 1024 * 1024))
+                print("VIDEO_FOOTAGE_OK:", path)
+                return {"path": path, **found}
+            except Exception as exc:
+                print("Video download skipped:", exc)
+    return None
+
+
 def make_frames(item):
     os.makedirs(WORK, exist_ok=True)
     bg = make_base_photo(item)
-    if bg is None:
-        # No generic Google image: use a clean cricket-themed background instead.
-        bg = Image.new("RGB", (W, H), (8, 24, 65))
+    video_source = find_cricket_video(item)
 
     title = translate_to_hindi(item["title"])[:190]
     summary = translate_to_hindi(item["summary"]) if item["summary"] else "क्रिकेट से जुड़ी यह ताज़ा खबर चर्चा में है।"
@@ -393,8 +447,36 @@ def make_voice(item):
     print("HINDI_VOICE_OK")
 
 
-def make_video():
-    cmd = [
+def make_video(video_source=None):
+    if video_source:
+        # Use the freely licensed Commons footage as the moving background.
+        # The generated Hindi text is added as transparent overlays.
+        base = os.path.join(WORK, "cricket_background.mp4")
+        cmd_bg = [
+            "ffmpeg", "-y", "-stream_loop", "-1", "-i", video_source["path"],
+            "-t", "30",
+            "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1",
+            "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "25",
+            "-pix_fmt", "yuv420p", base
+        ]
+        subprocess.run(cmd_bg, check=True)
+        cmd = [
+            "ffmpeg", "-y", "-i", base,
+            "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "overlay0.png"),
+            "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "overlay1.png"),
+            "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "overlay2.png"),
+            "-i", os.path.join(WORK, "voice.mp3"),
+            "-filter_complex",
+            "[0:v][1:v]overlay=0:0[v0];[0:v][2:v]overlay=0:0[v1];[0:v][3:v]overlay=0:0[v2];"
+            "[v0][v1][v2]concat=n=3:v=1:a=0[v]",
+            "-map", "[v]", "-map", "4:a",
+            "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,atempo=1.08",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "27",
+            "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p",
+            "-shortest", "-movflags", "+faststart", OUT
+        ]
+    else:
+        cmd = [
         "ffmpeg", "-y",
         "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "frame0.jpg"),
         "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "frame1.jpg"),
@@ -424,7 +506,7 @@ def main():
     print("RSS/article image found:", bool(item["image"]))
     make_frames(item)
     make_voice(item)
-    make_video()
+    make_video(video_source)
     print("VIDEO_CREATED:", OUT)
 
 
