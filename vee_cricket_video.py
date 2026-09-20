@@ -402,7 +402,7 @@ def make_frames(item):
             d.text((55, 1765), "वी न्यूज़ को फॉलो करें", font=ImageFont.truetype(HINDI_BOLD, 38), fill=(255, 210, 0))
             d.text((55, 1845), datetime.now(IST).strftime("%d %b %Y | %H:%M IST"), font=ImageFont.truetype(ENG, 27), fill="white")
 
-        frame.save(os.path.join(WORK, f"frame{i}.jpg"), quality=94)
+        frame.save(os.path.join(WORK, f"frame{i}.jpg"), quality=94); overlay = frame.copy().convert("RGBA"); overlay.putalpha(255); overlay.save(os.path.join(WORK, f"overlay{i}.png"))
 
 
 def make_voice(item):
@@ -449,8 +449,7 @@ def make_voice(item):
 
 def make_video(video_source=None):
     if video_source:
-        # Use the freely licensed Commons footage as the moving background.
-        # The generated Hindi text is added as transparent overlays.
+        # One 30-second portrait background clip, split into three 10-second scenes.
         base = os.path.join(WORK, "cricket_background.mp4")
         cmd_bg = [
             "ffmpeg", "-y", "-stream_loop", "-1", "-i", video_source["path"],
@@ -461,15 +460,22 @@ def make_video(video_source=None):
         ]
         subprocess.run(cmd_bg, check=True)
         cmd = [
-            "ffmpeg", "-y", "-i", base,
-            "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "overlay0.png"),
-            "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "overlay1.png"),
-            "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "overlay2.png"),
+            "ffmpeg", "-y",
+            "-i", base,
             "-i", os.path.join(WORK, "voice.mp3"),
             "-filter_complex",
-            "[0:v][1:v]overlay=0:0[v0];[0:v][2:v]overlay=0:0[v1];[0:v][3:v]overlay=0:0[v2];"
-            "[v0][v1][v2]concat=n=3:v=1:a=0[v]",
-            "-map", "[v]", "-map", "4:a",
+            "[0:v]split=3[v0][v1][v2];"
+            "[v0]trim=start=0:end=10,setpts=PTS-STARTPTS[va];"
+            "[v1]trim=start=10:end=20,setpts=PTS-STARTPTS[vb];"
+            "[v2]trim=start=20:end=30,setpts=PTS-STARTPTS[vc];"
+            "[va][2:v]overlay=0:0[oa];"
+            "[vb][3:v]overlay=0:0[ob];"
+            "[vc][4:v]overlay=0:0[oc];"
+            "[oa][ob][oc]concat=n=3:v=1:a=0[v]",
+            "-loop", "1", "-i", os.path.join(WORK, "overlay0.png"),
+            "-loop", "1", "-i", os.path.join(WORK, "overlay1.png"),
+            "-loop", "1", "-i", os.path.join(WORK, "overlay2.png"),
+            "-map", "[v]", "-map", "1:a",
             "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,atempo=1.08",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "27",
             "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p",
@@ -477,22 +483,22 @@ def make_video(video_source=None):
         ]
     else:
         cmd = [
-        "ffmpeg", "-y",
-        "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "frame0.jpg"),
-        "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "frame1.jpg"),
-        "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "frame2.jpg"),
-        "-i", os.path.join(WORK, "voice.mp3"),
-        "-filter_complex",
-        "[0:v]scale=1080:1920,setsar=1[v0];"
-        "[1:v]scale=1080:1920,setsar=1[v1];"
-        "[2:v]scale=1080:1920,setsar=1[v2];"
-        "[v0][v1][v2]concat=n=3:v=1:a=0[v]",
-        "-map", "[v]", "-map", "3:a",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "27",
-        "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,atempo=1.08",
-        "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p",
-        "-shortest", "-movflags", "+faststart", OUT
-    ]
+            "ffmpeg", "-y",
+            "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "frame0.jpg"),
+            "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "frame1.jpg"),
+            "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "frame2.jpg"),
+            "-i", os.path.join(WORK, "voice.mp3"),
+            "-filter_complex",
+            "[0:v]scale=1080:1920,setsar=1[v0];"
+            "[1:v]scale=1080:1920,setsar=1[v1];"
+            "[2:v]scale=1080:1920,setsar=1[v2];"
+            "[v0][v1][v2]concat=n=3:v=1:a=0[v]",
+            "-map", "[v]", "-map", "3:a",
+            "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,atempo=1.08",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "27",
+            "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p",
+            "-shortest", "-movflags", "+faststart", OUT
+        ]
     subprocess.run(cmd, check=True)
 
 
