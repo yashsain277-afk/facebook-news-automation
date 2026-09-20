@@ -16,6 +16,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 OUT = "vee_cricket_faceless.mp4"
 WORK = "vee_cricket_video_work"
 W, H = 1080, 1920
+SCENE_SECONDS = 10
 
 FEEDS = {
     "Team India": "https://news.google.com/rss/search?q=Team+India+cricket+OR+BCCI&hl=en-IN&gl=IN&ceid=IN:en",
@@ -52,18 +53,10 @@ def article_image_url(link):
     try:
         req = urllib.request.Request(
             link,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (X11; Linux x86_64) "
-                    "AppleWebKit/537.36 Chrome/153 Safari/537.36"
-                )
-            },
+            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/153 Safari/537.36"},
         )
         with urllib.request.urlopen(req, timeout=15) as r:
-            final_url = r.geturl()
             raw = r.read(900000)
-        if is_bad_image_url(final_url):
-            return ""
         text = raw.decode("utf-8", errors="ignore")
         patterns = [
             r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)',
@@ -93,7 +86,6 @@ def rss_image(entry):
 
 
 def commons_image(query):
-    """Free-to-reuse fallback from Wikimedia Commons, with attribution metadata."""
     try:
         params = {
             "action": "query",
@@ -120,11 +112,7 @@ def commons_image(query):
                 artist = clean(meta.get("Artist", {}).get("value", ""))[:100]
                 license_name = clean(meta.get("LicenseShortName", {}).get("value", ""))
                 print("COMMONS_PHOTO_OK:", page.get("title"), license_name)
-                return {
-                    "url": thumb,
-                    "credit": artist or "Wikimedia Commons",
-                    "license": license_name or "Commons license",
-                }
+                return {"url": thumb, "credit": artist or "Wikimedia Commons", "license": license_name or "Commons license"}
     except Exception as exc:
         print("Commons image search skipped:", exc)
     return None
@@ -147,9 +135,7 @@ def get_items():
             if not source:
                 source = title.rsplit(" - ", 1)[-1]
             summary = clean(e.get("summary", "") or e.get("description", ""))
-            image = rss_image(e)
-            if not image:
-                image = article_image_url(link)
+            image = rss_image(e) or article_image_url(link)
             items.append({
                 "title": re.sub(r"\s+-\s+[^-]+$", "", title).strip(),
                 "summary": summary[:550],
@@ -185,11 +171,7 @@ def download_image(url):
 
 def cover(img):
     if img is None:
-        img = Image.new("RGB", (W, H), (8, 24, 65))
-        d = ImageDraw.Draw(img)
-        d.text((75, 720), "CRICKET", font=ImageFont.truetype(ENG_BOLD, 95), fill=(255, 210, 0))
-        d.text((75, 840), "NEWS", font=ImageFont.truetype(ENG_BOLD, 95), fill="white")
-        return img
+        return None
     ratio = max(W / img.width, H / img.height)
     nw, nh = int(img.width * ratio), int(img.height * ratio)
     img = img.resize((nw, nh), Image.Resampling.LANCZOS)
@@ -220,11 +202,7 @@ def runs(text):
 
 
 def mixed_width(draw, text, size, bold=False):
-    total = 0
-    for run, _ in runs(text):
-        box = draw.textbbox((0, 0), run, font=font_for(run, size, bold))
-        total += box[2] - box[0]
-    return total
+    return sum(draw.textbbox((0, 0), run, font=font_for(run, size, bold))[2] for run, _ in runs(text))
 
 
 def draw_mixed(draw, xy, text, size, fill, bold=False):
@@ -253,21 +231,35 @@ def wrap_mixed(draw, text, size, max_width, bold=False, max_lines=5):
     return lines[:max_lines]
 
 
-def make_frames(item, photo_info):
+def make_base_photo(item):
+    img = download_image(item["image"])
+    if img:
+        return cover(img)
+    fallback = commons_image(item["title"])
+    if fallback:
+        print("Using Commons fallback:", fallback["credit"], fallback["license"])
+        return cover(download_image(fallback["url"]))
+    return None
+
+
+def make_frames(item):
     os.makedirs(WORK, exist_ok=True)
-    bg = cover(download_image(item["image"]))
-    if bg is None and photo_info:
-        bg = cover(download_image(photo_info["url"]))
+    bg = make_base_photo(item)
+    if bg is None:
+        # No generic Google image: use a clean cricket-themed background instead.
+        bg = Image.new("RGB", (W, H), (8, 24, 65))
+
     title = item["title"][:190]
     summary = item["summary"] or "क्रिकेट से जुड़ी यह ताजा खबर चर्चा में है।"
 
     for i in range(3):
         frame = bg.copy()
         d = ImageDraw.Draw(frame, "RGBA")
-        d.rectangle([0, 0, W, 220], fill=(5, 20, 55, 220))
-        d.rectangle([0, 1470, W, H], fill=(5, 20, 55, 238))
+        if bg.getbbox():
+            # subtle dark gradient-like bands
+            d.rectangle([0, 0, W, 220], fill=(5, 20, 55, 225))
+            d.rectangle([0, 1470, W, H], fill=(5, 20, 55, 238))
         d.rectangle([0, 0, 18, H], fill=(221, 24, 31, 255))
-
         d.rounded_rectangle([42, 35, 285, 120], 18, fill=(221, 24, 31, 255))
         draw_mixed(d, (70, 52), "VEE NEWS", 34, "white", True)
         draw_mixed(d, (325, 45), "क्रिकेट अपडेट", 52, (255, 210, 0), True)
@@ -313,11 +305,11 @@ def make_voice(item):
 
 
 def make_video():
-    subprocess.run([
+    cmd = [
         "ffmpeg", "-y",
-        "-loop", "1", "-i", os.path.join(WORK, "frame0.jpg"),
-        "-loop", "1", "-i", os.path.join(WORK, "frame1.jpg"),
-        "-loop", "1", "-i", os.path.join(WORK, "frame2.jpg"),
+        "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "frame0.jpg"),
+        "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "frame1.jpg"),
+        "-loop", "1", "-t", str(SCENE_SECONDS), "-i", os.path.join(WORK, "frame2.jpg"),
         "-i", os.path.join(WORK, "voice.mp3"),
         "-filter_complex",
         "[0:v]scale=1080:1920,setsar=1[v0];"
@@ -328,7 +320,8 @@ def make_video():
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "27",
         "-c:a", "aac", "-b:a", "96k", "-pix_fmt", "yuv420p",
         "-shortest", "-movflags", "+faststart", OUT
-    ], check=True)
+    ]
+    subprocess.run(cmd, check=True)
 
 
 def main():
@@ -336,19 +329,10 @@ def main():
     item = choose(items)
     if not item:
         raise RuntimeError("No cricket news found.")
-
     print("Selected topic:", item["title"])
     print("Source:", item["source"])
     print("RSS/article image found:", bool(item["image"]))
-
-    photo_info = None
-    if not item["image"]:
-        # Use a free/licensed Wikimedia Commons image instead of Google logos.
-        photo_info = commons_image(item["title"])
-        if photo_info:
-            print("Using Wikimedia Commons photo:", photo_info["credit"], photo_info["license"])
-
-    make_frames(item, photo_info)
+    make_frames(item)
     make_voice(item)
     make_video()
     print("VIDEO_CREATED:", OUT)
