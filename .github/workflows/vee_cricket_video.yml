@@ -1,0 +1,35 @@
+name: Vee News - Faceless Cricket Video Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  faceless-cricket-video:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install free tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg espeak-ng fonts-noto-core fonts-noto-extra fonts-dejavu
+          pip install Pillow feedparser
+
+      - name: Create faceless cricket video
+        run: python vee_cricket_video.py
+
+      - name: Upload test video
+        uses: actions/upload-artifact@v4
+        with:
+          name: vee-cricket-faceless-video
+          path: vee_cricket_faceless.mp4
+          retention-days: 7
