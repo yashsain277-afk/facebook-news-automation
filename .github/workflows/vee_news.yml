@@ -1,9 +1,13 @@
-name: Vee News - Daily Cricket News
+name: Vee News - Every 6 Hours + Daily Cricket
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 3 * * *" # 9:00 AM IST daily
+    - cron: "0 0 * * *"      # 5:30 AM IST
+    - cron: "30 3 * * *"     # 9:00 AM IST - Daily Cricket
+    - cron: "0 6 * * *"      # 11:30 AM IST
+    - cron: "0 12 * * *"     # 5:30 PM IST
+    - cron: "0 18 * * *"     # 11:30 PM IST
 
 permissions:
   contents: write
