@@ -18,27 +18,48 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check uploaded inputs
+        id: input_check
+        shell: bash
+        run: |
+          set -e
+          text_count=$(find incoming_news -maxdepth 1 -type f \( -iname "*.txt" -o -iname "*.md" \) | wc -l)
+          media_count=$(find incoming_news -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" -o -iname "*.mp4" -o -iname "*.mov" -o -iname "*.m4v" -o -iname "*.webm" -o -iname "*.avi" -o -iname "*.mkv" \) | wc -l)
+          echo "text_count=$text_count"
+          echo "media_count=$media_count"
+          if [ "$text_count" -gt 0 ] && [ "$media_count" -gt 0 ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Both a text file and a photo/video are required. Waiting for the next upload."
+          fi
+
       - name: Setup Python
+        if: steps.input_check.outputs.ready == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install FFmpeg and Hindi fonts
+        if: steps.input_check.outputs.ready == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-extra fonts-dejavu
 
       - name: Install Python packages
+        if: steps.input_check.outputs.ready == 'true'
         run: |
           pip install Pillow gTTS
 
       - name: Create 30-55 second news video and post to Facebook
+        if: steps.input_check.outputs.ready == 'true'
         env:
           VEE_NEWS_PAGE_ID: ${{ secrets.VEE_NEWS_PAGE_ID }}
           VEE_NEWS_PAGE_ACCESS_TOKEN: ${{ secrets.VEE_NEWS_PAGE_ACCESS_TOKEN }}
         run: python vee_upload_news.py
 
       - name: Save generated video and script
+        if: steps.input_check.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: vee-news-upload-result
