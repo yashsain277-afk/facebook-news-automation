@@ -27,9 +27,17 @@ jobs:
       - name: Create faceless cricket video
         run: python vee_cricket_video.py
 
-      - name: Upload test video
+      - name: Check generated video
+        run: |
+          test -s vee_cricket_faceless.mp4
+          ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 vee_cricket_faceless.mp4
+
+      - name: Upload video and debug files
         uses: actions/upload-artifact@v4
         with:
           name: vee-cricket-faceless-video
-          path: vee_cricket_faceless.mp4
+          path: |
+            vee_cricket_faceless.mp4
+            vee_cricket_video_work/frame*.jpg
+            vee_cricket_video_work/script.txt
           retention-days: 7
