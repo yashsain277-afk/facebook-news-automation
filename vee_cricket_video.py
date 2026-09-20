@@ -234,12 +234,25 @@ def wrap_mixed(draw, text, size, max_width, bold=False, max_lines=5):
 def make_base_photo(item):
     img = download_image(item["image"])
     if img:
+        print("PHOTO_SOURCE: article")
         return cover(img)
-    fallback = commons_image(item["title"])
-    if fallback:
-        print("Using Commons fallback:", fallback["credit"], fallback["license"])
-        return cover(download_image(fallback["url"]))
-    return None
+
+    for query in ("India cricket", "cricket stadium", "cricket match"):
+        fallback = commons_image(query)
+        if fallback:
+            print("Using Commons fallback:", fallback["credit"], fallback["license"])
+            img = download_image(fallback["url"])
+            if img:
+                print("PHOTO_SOURCE: wikimedia")
+                return cover(img)
+
+    fallback_url = "https://commons.wikimedia.org/wiki/Special:FilePath/Rajiv%20Gandhi%20International%20Cricket%20Stadium.jpg?width=1200"
+    img = download_image(fallback_url)
+    if img:
+        print("PHOTO_SOURCE: guaranteed-wikimedia")
+        return cover(img)
+
+    raise RuntimeError("No usable cricket photo could be downloaded.")
 
 
 def make_frames(item):
@@ -261,32 +274,53 @@ def make_frames(item):
             d.rectangle([0, 1470, W, H], fill=(5, 20, 55, 238))
         d.rectangle([0, 0, 18, H], fill=(221, 24, 31, 255))
         d.rounded_rectangle([42, 35, 285, 120], 18, fill=(221, 24, 31, 255))
-        draw_mixed(d, (70, 52), "VEE NEWS", 34, "white", True)
-        draw_mixed(d, (325, 45), "क्रिकेट अपडेट", 52, (255, 210, 0), True)
+        d.text((70, 52), "VEE NEWS", font=ImageFont.truetype(ENG_BOLD, 34), fill="white")
+        d.text((325, 45), "क्रिकेट अपडेट", font=ImageFont.truetype(HINDI_BOLD, 52), fill=(255, 210, 0))
 
         if i == 0:
-            lines = wrap_mixed(d, title, 56, 930, True, 4)
+            if any(is_hindi_char(ch) for ch in title):
+                title_lines = wrap_mixed(d, title, 56, 930, True, 4)
+                title_font = ImageFont.truetype(HINDI_BOLD, 56)
+            else:
+                title_lines = []
+                words = title.split()
+                line = ""
+                for word in words:
+                    test = word if not line else line + " " + word
+                    if d.textbbox((0, 0), test, font=ImageFont.truetype(ENG_BOLD, 56))[2] <= 930:
+                        line = test
+                    else:
+                        if line:
+                            title_lines.append(line)
+                        line = word
+                if line:
+                    title_lines.append(line)
+                title_lines = title_lines[:4]
+                title_font = ImageFont.truetype(ENG_BOLD, 56)
             y = 1515
-            for line in lines:
-                draw_mixed(d, (55, y), line, 56, "white", True)
+            for line in title_lines:
+                d.text((55, y), line, font=title_font, fill="white")
                 y += 72
         elif i == 1:
             draw_mixed(d, (55, 1505), "मुख्य अपडेट", 50, (255, 210, 0), True)
             lines = wrap_mixed(d, summary, 38, 930, False, 6)
             y = 1580
             for line in lines:
-                draw_mixed(d, (55, y), line, 38, "white", False)
+                if any(is_hindi_char(ch) for ch in line):
+                    d.text((55, y), line, font=ImageFont.truetype(HINDI, 38), fill="white")
+                else:
+                    d.text((55, y), line, font=ImageFont.truetype(ENG, 38), fill="white")
                 y += 55
         else:
-            draw_mixed(d, (55, 1510), "स्रोत", 50, (255, 210, 0), True)
+            d.text((55, 1510), "स्रोत", font=ImageFont.truetype(HINDI_BOLD, 50), fill=(255, 210, 0))
             source_lines = wrap_mixed(d, item["source"][:55], 38, 930, False, 2)
             y = 1585
             for line in source_lines:
-                draw_mixed(d, (55, y), line, 38, "white", False)
+                d.text((55, y), line, font=ImageFont.truetype(ENG, 38), fill="white")
                 y += 55
-            draw_mixed(d, (55, 1700), "ताजा क्रिकेट खबरों के लिए", 38, "white", True)
-            draw_mixed(d, (55, 1765), "Vee News को फॉलो करें", 38, (255, 210, 0), True)
-            draw_mixed(d, (55, 1845), datetime.now(IST).strftime("%d %b %Y | %H:%M IST"), 27, "white")
+            d.text((55, 1700), "ताजा क्रिकेट खबरों के लिए", font=ImageFont.truetype(HINDI_BOLD, 38), fill="white")
+            d.text((55, 1765), "FOLLOW VEE NEWS", font=ImageFont.truetype(ENG_BOLD, 38), fill=(255, 210, 0))
+            d.text((55, 1845), datetime.now(IST).strftime("%d %b %Y | %H:%M IST"), font=ImageFont.truetype(ENG, 27), fill="white")
 
         frame.save(os.path.join(WORK, f"frame{i}.jpg"), quality=94)
 
