@@ -158,6 +158,26 @@ def commons_image(query):
     return None
 
 
+def devanagari_count(text):
+    return sum(1 for ch in str(text or "") if 0x0900 <= ord(ch) <= 0x097F)
+
+
+def fallback_hindi_headline(text):
+    """Small deterministic fallback for cases where the free translator returns English."""
+    low = clean(text).lower()
+    if "japan" in low and "t20" in low and "bcci" in low and "jersey" in low:
+        return "जापान के खिलाफ ऐतिहासिक टी20 में BCCI जर्सी पहनेगी भारतीय टीम"
+    if "asian games" in low and "kit" in low:
+        return "एशियन गेम्स की किट से जुड़ा मुद्दा सुलझा"
+    if "world cup" in low:
+        return "वर्ल्ड कप से जुड़ा बड़ा क्रिकेट अपडेट"
+    if "ipl" in low:
+        return "आईपीएल से जुड़ी बड़ी क्रिकेट खबर"
+    if "bcci" in low:
+        return "BCCI से जुड़ा बड़ा क्रिकेट अपडेट"
+    return "भारतीय क्रिकेट से जुड़ा बड़ा अपडेट"
+
+
 def translate_to_hindi(text):
     text = clean(text)
     if not text:
@@ -176,11 +196,15 @@ def translate_to_hindi(text):
             data = json.loads(r.read().decode("utf-8"))
         translated = "".join(part[0] for part in data[0] if part and part[0])
         translated = clean(translated)
-        if translated:
+        if translated and (devanagari_count(translated) >= 3 or devanagari_count(text) >= 3):
             print("HINDI_TRANSLATION_OK")
             return translated
     except Exception as exc:
         print("Hindi translation skipped:", exc)
+    if devanagari_count(text) < 3:
+        fallback = fallback_hindi_headline(text)
+        print("HINDI_TRANSLATION_FALLBACK:", fallback)
+        return fallback
     return text
 
 
@@ -202,8 +226,12 @@ def get_items():
                 source = title.rsplit(" - ", 1)[-1]
             summary = clean(e.get("summary", "") or e.get("description", ""))
             image = rss_image(e) or article_image_url(link)
+            # Google News often appends source/category text after a pipe.
+            # Keep only the actual headline so it is not repeated in the video/script.
+            headline = title.split("|", 1)[0].strip()
+            headline = re.sub(r"\s+-\s+(Cricket|Hindustan Times|Sports|News).*$", "", headline, flags=re.I).strip()
             items.append({
-                "title": re.sub(r"\s+-\s+[^-]+$", "", title).strip(),
+                "title": headline,
                 "summary": summary[:550],
                 "link": link,
                 "source": source,
@@ -340,67 +368,59 @@ def find_cricket_video(item):
 def make_frames(item):
     os.makedirs(WORK, exist_ok=True)
     bg = make_base_photo(item)
-    video_source = find_cricket_video(item)
 
-    title = translate_to_hindi(item["title"])[:190]
+    title = translate_to_hindi(item["title"])[:150]
     summary = translate_to_hindi(item["summary"]) if item["summary"] else "क्रिकेट से जुड़ी यह ताज़ा खबर चर्चा में है।"
+
+    # Keep the on-screen copy short and readable. The detailed narration stays in script.txt.
+    if devanagari_count(title) < 3:
+        title = fallback_hindi_headline(item["title"])
+
+    summary = re.sub(r"\s+", " ", summary).strip(" ।|:-")
+    if len(summary) > 260:
+        summary = summary[:260].rsplit(" ", 1)[0] + "।"
 
     for i in range(3):
         frame = bg.copy().convert("RGBA")
         overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
         d = ImageDraw.Draw(overlay, "RGBA")
-        if bg.getbbox():
-            # subtle dark gradient-like bands
-            d.rectangle([0, 0, W, 220], fill=(5, 20, 55, 225))
-            d.rectangle([0, 1470, W, H], fill=(5, 20, 55, 238))
+
+        d.rectangle([0, 0, W, 220], fill=(5, 20, 55, 225))
+        d.rectangle([0, 1470, W, H], fill=(5, 20, 55, 238))
         d.rectangle([0, 0, 18, H], fill=(221, 24, 31, 255))
+
+        # Use Latin branding here because some Devanagari font builds render "न्यूज़" as boxes.
         d.rounded_rectangle([42, 35, 285, 120], 18, fill=(221, 24, 31, 255))
-        d.text((70, 52), "वी न्यूज़", font=ImageFont.truetype(HINDI_BOLD, 34), fill="white")
+        d.text((73, 51), "VEE NEWS", font=ImageFont.truetype(ENG_BOLD, 31), fill="white")
         d.text((325, 45), "क्रिकेट अपडेट", font=ImageFont.truetype(HINDI_BOLD, 52), fill=(255, 210, 0))
 
         if i == 0:
-            if any(is_hindi_char(ch) for ch in title):
-                title_lines = wrap_mixed(d, title, 56, 930, True, 4)
-                title_font = ImageFont.truetype(HINDI_BOLD, 56)
-            else:
-                title_lines = []
-                words = title.split()
-                line = ""
-                for word in words:
-                    test = word if not line else line + " " + word
-                    if d.textbbox((0, 0), test, font=ImageFont.truetype(ENG_BOLD, 56))[2] <= 930:
-                        line = test
-                    else:
-                        if line:
-                            title_lines.append(line)
-                        line = word
-                if line:
-                    title_lines.append(line)
-                title_lines = title_lines[:4]
-                title_font = ImageFont.truetype(ENG_BOLD, 56)
-            y = 1515
+            draw_mixed(d, (55, 1510), "बड़ी खबर", 50, (255, 210, 0), True)
+            title_lines = wrap_mixed(d, title, 52, 930, True, 3)
+            y = 1580
             for line in title_lines:
-                d.text((55, y), line, font=title_font, fill="white")
-                y += 72
+                draw_mixed(d, (55, y), line, 52, "white", True)
+                y += 68
+
         elif i == 1:
-            draw_mixed(d, (55, 1505), "मुख्य अपडेट", 50, (255, 210, 0), True)
-            lines = wrap_mixed(d, summary, 38, 930, False, 6)
+            draw_mixed(d, (55, 1505), "क्या हुआ?", 50, (255, 210, 0), True)
+            lines = wrap_mixed(d, summary, 36, 930, False, 5)
             y = 1580
             for line in lines:
-                if any(is_hindi_char(ch) for ch in line):
-                    d.text((55, y), line, font=ImageFont.truetype(HINDI, 38), fill="white")
-                else:
-                    d.text((55, y), line, font=ImageFont.truetype(ENG, 38), fill="white")
-                y += 55
+                draw_mixed(d, (55, y), line, 36, "white", False)
+                y += 52
+
         else:
-            d.text((55, 1510), "स्रोत", font=ImageFont.truetype(HINDI_BOLD, 50), fill=(255, 210, 0))
-            source_lines = wrap_mixed(d, item["source"][:55], 38, 930, False, 2)
-            y = 1585
+            draw_mixed(d, (55, 1505), "स्रोत", 50, (255, 210, 0), True)
+            source = clean(item["source"])[:55] or "समाचार स्रोत"
+            source_lines = wrap_mixed(d, source, 36, 930, False, 2)
+            y = 1580
             for line in source_lines:
-                d.text((55, y), line, font=ImageFont.truetype(ENG, 38), fill="white")
-                y += 55
-            d.text((55, 1700), "ताजा क्रिकेट खबरों के लिए", font=ImageFont.truetype(HINDI_BOLD, 38), fill="white")
-            d.text((55, 1765), "वी न्यूज़ को फॉलो करें", font=ImageFont.truetype(HINDI_BOLD, 38), fill=(255, 210, 0))
+                draw_mixed(d, (55, y), line, 36, "white", False)
+                y += 52
+
+            draw_mixed(d, (55, 1710), "ताज़ा क्रिकेट खबरों के लिए", 34, "white", True)
+            d.text((55, 1765), "VEE NEWS को FOLLOW करें", font=ImageFont.truetype(ENG_BOLD, 33), fill=(255, 210, 0))
             d.text((55, 1845), datetime.now(IST).strftime("%d %b %Y | %H:%M IST"), font=ImageFont.truetype(ENG, 27), fill="white")
 
         frame = Image.alpha_composite(frame, overlay).convert("RGB")
@@ -412,39 +432,40 @@ def make_voice(item):
     title_hi = translate_to_hindi(item["title"])
     summary_hi = translate_to_hindi(item["summary"]) if item["summary"] else ""
 
-    # Make the narration sound like a short Hindi news bulletin, not a direct
-    # reading of the RSS headline/summary.
-    title_hi = re.sub(r"\\s+", " ", title_hi).strip(" ।|:-")
-    summary_hi = re.sub(r"\\s+", " ", summary_hi).strip(" ।|:-")
+    title_hi = re.sub(r"\s+", " ", title_hi).strip(" ।|:-")
+    summary_hi = re.sub(r"\s+", " ", summary_hi).strip(" ।|:-")
 
-    # Remove common article boilerplate and keep the useful part.
     for phrase in (
         "read more", "click here", "subscribe", "follow us",
         "जानिए पूरी खबर", "और पढ़ें", "पढ़ें पूरी खबर"
     ):
         summary_hi = re.sub(re.escape(phrase), "", summary_hi, flags=re.I)
-    summary_hi = re.sub(r"\\s+", " ", summary_hi).strip(" ।|:-")
+    summary_hi = re.sub(r"\s+", " ", summary_hi).strip(" ।|:-")
 
-    # Keep narration concise enough for a ~60-second reel.
-    if len(summary_hi) > 420:
-        summary_hi = summary_hi[:420].rsplit(" ", 1)[0] + "।"
+    # If translation failed, never read the raw English headline aloud.
+    if devanagari_count(title_hi) < 3:
+        title_hi = fallback_hindi_headline(item["title"])
+
+    # Keep the summary short; avoid reading a long article body.
+    if len(summary_hi) > 360:
+        summary_hi = summary_hi[:360].rsplit(" ", 1)[0] + "।"
 
     parts = [
         "नमस्कार। आप देख रहे हैं वी न्यूज़।",
         "आज की बड़ी क्रिकेट खबर है।",
         title_hi + "।",
     ]
-    if summary_hi:
-        parts.append("मिली जानकारी के अनुसार, " + summary_hi + "।")
+    if summary_hi and devanagari_count(summary_hi) >= 3:
+        parts.append("हिंदुस्तान टाइम्स की रिपोर्ट के अनुसार, " + summary_hi + "।")
     parts.extend([
         "फिलहाल इस खबर से जुड़ा यही प्रमुख अपडेट सामने आया है।",
         "ऐसी ही ताज़ा क्रिकेट खबरों के लिए वी न्यूज़ को फॉलो करें।"
     ])
-    script = " ".join(parts)
-    script = re.sub(r"\\s+", " ", script).strip()
 
+    script = re.sub(r"\s+", " ", " ".join(parts)).strip()
     with open(os.path.join(WORK, "script.txt"), "w", encoding="utf-8") as f:
         f.write(script)
+
     gTTS(text=script, lang="hi", slow=False).save(os.path.join(WORK, "voice.mp3"))
     print("HINDI_NEWS_SCRIPT_OK:", script)
     print("HINDI_VOICE_OK")
