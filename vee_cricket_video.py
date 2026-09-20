@@ -19,9 +19,9 @@ W, H = 1080, 1920
 SCENE_SECONDS = 10
 
 FEEDS = {
-    "Team India": "https://news.google.com/rss/search?q=Team+India+cricket+OR+BCCI&hl=en-IN&gl=IN&ceid=IN:en",
-    "Cricket Trending": "https://news.google.com/rss/search?q=cricket+India+trending&hl=en-IN&gl=IN&ceid=IN:en",
-    "IPL": "https://news.google.com/rss/search?q=IPL+cricket&hl=en-IN&gl=IN&ceid=IN:en",
+    "टीम इंडिया": "https://news.google.com/rss/search?q=Team+India+cricket+OR+BCCI&hl=hi-IN&gl=IN&ceid=IN:hi",
+    "क्रिकेट ट्रेंडिंग": "https://news.google.com/rss/search?q=cricket+India+trending&hl=hi-IN&gl=IN&ceid=IN:hi",
+    "आईपीएल": "https://news.google.com/rss/search?q=IPL+cricket&hl=hi-IN&gl=IN&ceid=IN:hi",
 }
 
 HINDI = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
@@ -327,14 +327,14 @@ def make_frames(item):
 
 def make_voice(item):
     script = (
-        "नमस्कार। Vee News पर क्रिकेट की ताजा खबर। "
+        "नमस्कार। वी न्यूज़ पर क्रिकेट की ताज़ा खबर। "
         + item["title"] + "। "
-        + (item["summary"][:320] if item["summary"] else "इस खबर से जुड़ी ताजा जानकारी सामने आई है।")
-        + " अधिक अपडेट के लिए Vee News को फॉलो करें।"
+        + (item["summary"][:320] if item["summary"] else "इस खबर से जुड़ी ताज़ा जानकारी सामने आई है।")
+        + " अधिक अपडेट के लिए वी न्यूज़ को फॉलो करें।"
     )
     with open(os.path.join(WORK, "script.txt"), "w", encoding="utf-8") as f:
         f.write(script)
-    gTTS(text=script, lang="hi", slow=False).save(os.path.join(WORK, "voice.mp3"))
+    gTTS(text=script, lang="hi", slow=True).save(os.path.join(WORK, "voice.mp3"))
     print("HINDI_VOICE_OK")
 
 
