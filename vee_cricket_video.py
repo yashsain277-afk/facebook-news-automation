@@ -272,7 +272,7 @@ def make_base_photo(item):
                 print("PHOTO_SOURCE: wikimedia")
                 return cover(img)
 
-    fallback_url = "https://commons.wikimedia.org/wiki/Special:FilePath/Rajiv%20Gandhi%20International%20Cricket%20Stadium.jpg?width=1200"
+    fallback_url = "https://commons.wikimedia.org/wiki/Special:FilePath/Indian%20cricket%20team.jpg?width=1200"
     img = download_image(fallback_url)
     if img:
         print("PHOTO_SOURCE: guaranteed-wikimedia")
@@ -300,7 +300,7 @@ def make_frames(item):
             d.rectangle([0, 1470, W, H], fill=(5, 20, 55, 238))
         d.rectangle([0, 0, 18, H], fill=(221, 24, 31, 255))
         d.rounded_rectangle([42, 35, 285, 120], 18, fill=(221, 24, 31, 255))
-        d.text((70, 52), "VEE NEWS", font=ImageFont.truetype(ENG_BOLD, 34), fill="white")
+        d.text((70, 52), "वी न्यूज़", font=ImageFont.truetype(HINDI_BOLD, 34), fill="white")
         d.text((325, 45), "क्रिकेट अपडेट", font=ImageFont.truetype(HINDI_BOLD, 52), fill=(255, 210, 0))
 
         if i == 0:
@@ -345,7 +345,7 @@ def make_frames(item):
                 d.text((55, y), line, font=ImageFont.truetype(ENG, 38), fill="white")
                 y += 55
             d.text((55, 1700), "ताजा क्रिकेट खबरों के लिए", font=ImageFont.truetype(HINDI_BOLD, 38), fill="white")
-            d.text((55, 1765), "FOLLOW VEE NEWS", font=ImageFont.truetype(ENG_BOLD, 38), fill=(255, 210, 0))
+            d.text((55, 1765), "वी न्यूज़ को फॉलो करें", font=ImageFont.truetype(HINDI_BOLD, 38), fill=(255, 210, 0))
             d.text((55, 1845), datetime.now(IST).strftime("%d %b %Y | %H:%M IST"), font=ImageFont.truetype(ENG, 27), fill="white")
 
         frame.save(os.path.join(WORK, f"frame{i}.jpg"), quality=94)
@@ -362,7 +362,7 @@ def make_voice(item):
     )
     with open(os.path.join(WORK, "script.txt"), "w", encoding="utf-8") as f:
         f.write(script)
-    gTTS(text=script, lang="hi", slow=True).save(os.path.join(WORK, "voice.mp3"))
+    gTTS(text=script, lang="hi", slow=False).save(os.path.join(WORK, "voice.mp3"))
     print("HINDI_VOICE_OK")
 
 
@@ -380,7 +380,7 @@ def make_video():
         "[v0][v1][v2]concat=n=3:v=1:a=0[v]",
         "-map", "[v]", "-map", "3:a",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "27",
-        "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
+        "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,atempo=1.08",
         "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p",
         "-shortest", "-movflags", "+faststart", OUT
     ]
