@@ -274,7 +274,13 @@ def cover(img):
 
 
 def font_for(run, size, bold=False):
-    path = HINDI_BOLD if bold else HINDI if any(is_hindi_char(c) for c in run) else ENG_BOLD if bold else ENG
+    # Pick the script first, then the weight. The previous conditional gave
+    # every bold Latin run the Devanagari font, which produced square boxes.
+    has_hindi = any(is_hindi_char(c) for c in run)
+    if has_hindi:
+        path = HINDI_BOLD if bold else HINDI
+    else:
+        path = ENG_BOLD if bold else ENG
     return ImageFont.truetype(path, size, layout_engine=ImageFont.Layout.RAQM)
 
 
