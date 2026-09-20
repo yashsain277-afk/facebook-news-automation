@@ -6,6 +6,7 @@ import uuid
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
+from io import BytesIO
 from difflib import SequenceMatcher
 
 import feedparser
@@ -57,6 +58,44 @@ def published_of(entry):
         pass
     return datetime.now(timezone.utc)
 
+def extract_image_url(entry):
+    candidates = []
+    for key in ("media_content", "media_thumbnail"):
+        for media in entry.get(key, []) or []:
+            if isinstance(media, dict) and media.get("url"):
+                candidates.append(media["url"])
+    for link in entry.get("links", []) or []:
+        if isinstance(link, dict) and link.get("href") and str(link.get("type","")).startswith("image/"):
+            candidates.append(link["href"])
+    summary = str(entry.get("summary","") or entry.get("description","") or "")
+    m = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', summary, flags=re.I)
+    if m:
+        candidates.append(html.unescape(m.group(1)))
+    return candidates[0] if candidates else ""
+
+def article_image_url(link):
+    if not link:
+        return ""
+    try:
+        req = urllib.request.Request(
+            link,
+            headers={"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/153 Safari/537.36"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as response:
+            data = response.read(500000)
+        text = data.decode("utf-8", errors="ignore")
+        for pattern in (
+            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+            r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)["\']',
+        ):
+            m = re.search(pattern, text, flags=re.I)
+            if m:
+                return html.unescape(m.group(1))
+    except Exception:
+        pass
+    return ""
+
 def collect(feeds, kind):
     out = []
     for category, url in feeds.items():
@@ -66,8 +105,12 @@ def collect(feeds, kind):
             link = entry.get("link", "")
             if not title or not link: continue
             summary = clean_html(entry.get("summary", "") or entry.get("description", ""))
+            image_url = extract_image_url(entry)
+            if not image_url:
+                image_url = article_image_url(link)
             out.append({"title":title,"link":link,"source":source_of(entry),
                         "summary":summary,"published":published_of(entry),
+                        "image_url":image_url,
                         "kind":kind,"category":category})
     return out
 
@@ -104,18 +147,19 @@ def simple_title(item):
     return " ".join(title.split()[:14])
 
 def simple_summary(item):
-    if item["kind"]=="cricket":
-        return "टीम इंडिया और क्रिकेट से जुड़ी यह ताजा खबर है। Vee News इस खबर पर नजर रख रहा है। नई जानकारी मिलने पर अपडेट किया जाएगा।"
-    return "यह देश से जुड़ी ताजा प्रमुख खबर है। Vee News इस खबर पर नजर रख रहा है। नई जानकारी मिलने पर अपडेट किया जाएगा।"
+    summary = clean_html(item.get("summary",""))
+    if summary:
+        return " ".join(summary.split())[:420]
+    return "टीम इंडिया और क्रिकेट से जुड़ी यह ताजा खबर है। Vee News इस खबर पर नजर रख रहा है।"
 
 def build_description(item):
     title=simple_title(item)
     return (
-        f"📰 Vee News Update\n\n{title}\n\n"
-        f"क्या हुआ?\n{simple_summary(item)}\n\n"
-        f"क्यों महत्वपूर्ण है?\nयह अभी की प्रमुख अपडेट है। नई और सत्यापित जानकारी मिलने पर Vee News इसे अपडेट करेगा।\n\n"
-        f"स्रोत: {item['source']}\nVee News | Contact: {PHONE}\n\n"
-        f"#VeeNews #IndianCricket #TeamIndia #CricketNews #HindiNews"
+        f"🏏 Vee News Cricket Update\n\n{title}\n\n"
+        f"{simple_summary(item)}\n\n"
+        f"स्रोत: {item['source']}\n"
+        f"Vee News | Contact: {PHONE}\n\n"
+        f"#VeeNews #CricketNews #IndianCricket #TeamIndia #HindiNews"
     )
 
 HINDI="/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
@@ -124,8 +168,6 @@ ENG="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 ENG_BOLD="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
 def font(path,size):
-    # Use HarfBuzz/FriBidi shaping through Pillow's RAQM engine.
-    # This is required for correct Devanagari glyphs and matras in Hindi.
     return ImageFont.truetype(path,size,layout_engine=ImageFont.Layout.RAQM)
 
 def safe_text(text):
@@ -172,69 +214,103 @@ def wrap_mixed(draw,text,size,max_width,bold=False,max_lines=3):
         else:
             if cur: lines.append(cur)
             cur=word
-            if len(lines)>=max_lines:
-                break
+            if len(lines)>=max_lines: break
     if cur and len(lines)<max_lines: lines.append(cur)
     return lines[:max_lines]
 
+def load_news_photo(item):
+    url=item.get("image_url","")
+    if not url:
+        return None
+    try:
+        req=urllib.request.Request(
+            url,
+            headers={"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/153 Safari/537.36"}
+        )
+        with urllib.request.urlopen(req,timeout=20) as response:
+            data=response.read(8*1024*1024)
+        photo=Image.open(BytesIO(data)).convert("RGB")
+        return photo
+    except Exception as e:
+        print("News photo unavailable:",e)
+        return None
+
+def crop_cover(photo,size):
+    w,h=size
+    src_ratio=photo.width/photo.height
+    dst_ratio=w/h
+    if src_ratio>dst_ratio:
+        new_h=h
+        new_w=int(h*src_ratio)
+    else:
+        new_w=w
+        new_h=int(w/src_ratio)
+    photo=photo.resize((new_w,new_h),Image.Resampling.LANCZOS)
+    left=(new_w-w)//2; top=(new_h-h)//2
+    return photo.crop((left,top,left+w,top+h))
+
 def create_image(item):
-    # Permanent Vee News 9:16 branded frame.
-    im=Image.new("RGB",(WIDTH,HEIGHT),(7,31,76)); d=ImageDraw.Draw(im)
-    navy=(7,31,76); blue=(15,67,145); red=(226,24,34); yellow=(255,211,0)
-    white=(255,255,255); dark=(12,36,74); light=(246,249,253)
+    # Permanent Vee News 9:16 cricket-news format inspired by the approved reference.
+    im=Image.new("RGB",(WIDTH,HEIGHT),(6,24,67)); d=ImageDraw.Draw(im)
+    navy=(6,24,67); blue=(18,76,157); red=(221,24,31); yellow=(255,210,0)
+    white=(255,255,255); dark=(14,28,55); light=(247,249,252)
 
     d.rectangle([0,0,WIDTH,185],fill=navy)
-    d.polygon([(0,175),(680,175),(760,0),(690,0)],fill=yellow)
-    d.rounded_rectangle([42,32,170,160],radius=28,fill=red)
-    draw_mixed(d,(70,46),"V",78,white,True)
-    d.text((195,36),"Vee",font=font(ENG_BOLD,68),fill=white)
-    d.text((360,36),"News",font=font(ENG_BOLD,68),fill=yellow)
-    d.text((198,112),"FAST  |  TRUSTED  |  ALWAYS",font=font(ENG_BOLD,22),fill=white)
-    draw_mixed(d,(735,44),"देश की हर बड़ी खबर",28,white,True)
-    draw_mixed(d,(800,92),"सबसे पहले",32,yellow,True)
+    d.polygon([(0,0),(300,0),(240,185),(0,185)],fill=(18,91,190))
+    d.rounded_rectangle([35,30,175,165],radius=28,fill=red,outline=yellow,width=4)
+    draw_mixed(d,(62,49),"Vee",45,white,True)
+    d.text((62,101),"NEWS",font=font(ENG_BOLD,30),fill=yellow)
+    draw_mixed(d,(210,38),"क्रिकेट न्यूज़",55,white,True)
+    draw_mixed(d,(214,108),"सच के साथ, हर कदम",27,white,True)
+    d.rounded_rectangle([855,30,1040,150],radius=18,fill=yellow)
+    d.text((882,48),"CRICKET",font=font(ENG_BOLD,26),fill=dark)
+    d.text((897,88),"UPDATE",font=font(ENG_BOLD,25),fill=dark)
 
-    d.rounded_rectangle([24,205,1056,690],radius=24,fill=blue,outline=white,width=4)
-    d.ellipse([690,285,1010,605],fill=(26,104,194),outline=yellow,width=8)
-    d.ellipse([760,355,940,535],fill=red,outline=white,width=6)
-    d.line([790,370,910,520],fill=white,width=5); d.line([810,370,930,520],fill=white,width=5)
-    draw_mixed(d,(62,250),"CRICKET NEWS",38,yellow,True)
-    draw_mixed(d,(62,330),"INDIAN",62,white,True)
-    draw_mixed(d,(62,405),"CRICKET",62,yellow,True)
-    draw_mixed(d,(62,500),"Team India  •  Latest Update",28,white,True)
+    photo=load_news_photo(item)
+    if photo:
+        photo=crop_cover(photo,(1030,630))
+        im.paste(photo,(25,205))
+        d=ImageDraw.Draw(im)
+        d.rectangle([25,205,1055,835],outline=white,width=5)
+    else:
+        d.rounded_rectangle([25,205,1055,835],radius=22,fill=blue,outline=white,width=5)
+        draw_mixed(d,(95,340),"CRICKET",92,yellow,True)
+        draw_mixed(d,(95,450),"NEWS",92,white,True)
+        draw_mixed(d,(95,570),"TEAM INDIA",48,white,True)
 
-    d.polygon([(25,650),(565,650),(525,775),(0,775)],fill=red)
-    d.polygon([(550,650),(1035,650),(1080,775),(520,775)],fill=yellow)
-    d.text((72,674),"BREAKING",font=font(ENG_BOLD,60),fill=white)
-    d.text((620,674),"NEWS",font=font(ENG_BOLD,60),fill=dark)
+    d.polygon([(25,820),(1055,820),(1030,1085),(50,1085)],fill=red)
+    draw_mixed(d,(62,845),"ब्रेकिंग न्यूज़",34,yellow,True)
+    title_lines=wrap_mixed(d,simple_title(item),52,930,True,3)
+    y=895
+    for line in title_lines:
+        draw_mixed(d,(62,y),line,52,white,True); y+=62
 
-    d.rounded_rectangle([25,790,1055,1045],radius=20,fill=navy)
-    lines=wrap_mixed(d,simple_title(item),48,960,True,3); y=820
-    for line in lines:
-        draw_mixed(d,(55,y),line,48,white,True); y+=58
+    d.rounded_rectangle([55,1095,1025,1165],radius=15,fill=yellow)
+    stamp=datetime.now(IST).strftime("%d %b %Y | %H:%M IST")
+    draw_mixed(d,(78,1110),f"{item['source']}  •  {stamp}",24,dark,True)
 
-    d.rounded_rectangle([55,1000,1025,1070],radius=16,fill=yellow)
-    draw_mixed(d,(78,1012),f'{item["source"]}  •  ताजा अपडेट',25,dark,True)
+    d.rounded_rectangle([25,1190,1055,1615],radius=24,fill=light)
+    draw_mixed(d,(58,1230),"मुख्य अपडेट",38,blue,True)
+    body=wrap_mixed(d,simple_summary(item),30,930,False,6)
+    y=1295
+    for line in body:
+        draw_mixed(d,(58,y),line,30,dark,False); y+=50
+    d.line([58,1550,1022,1550],fill=(198,211,232),width=2)
+    draw_mixed(d,(58,1570),"स्रोत के आधार पर अपडेट • Vee News",24,blue,True)
 
-    d.rounded_rectangle([25,1095,1055,1585],radius=24,fill=light)
-    draw_mixed(d,(60,1135),"क्या हुआ?",36,blue,True)
-    body_lines=wrap_mixed(d,simple_summary(item),28,930,False,4); y=1195
-    for line in body_lines:
-        draw_mixed(d,(60,y),line,28,dark,False); y+=47
-    d.line([60,1480,1020,1480],fill=(200,214,235),width=2)
-    draw_mixed(d,(60,1505),"Team India  |  Cricket Update",25,blue,True)
-    draw_mixed(d,(700,1505),"Vee News",25,red,True)
+    d.rectangle([0,1635,WIDTH,1810],fill=navy)
+    draw_mixed(d,(55,1670),"भारतीय क्रिकेट की हर बड़ी खबर",34,white,True)
+    draw_mixed(d,(55,1725),"Team India  •  Cricket  •  Latest Updates",25,yellow,True)
+    d.rounded_rectangle([765,1670,1035,1775],radius=22,fill=red)
+    d.text((815,1694),"Vee News",font=font(ENG_BOLD,28),fill=white)
+    d.text((812,1734),"सच के साथ",font=font(HINDI_BOLD,22),fill=white)
 
-    d.rectangle([0,1605,WIDTH,1755],fill=navy)
-    draw_mixed(d,(55,1640),"Cricket  |  Team India  |  Latest Updates  |  Vee News",25,white,True)
-    d.rectangle([0,1755,WIDTH,1920],fill=yellow)
-    d.text((58,1790),"CONTACT US",font=font(ENG_BOLD,28),fill=dark)
-    d.text((300,1780),PHONE,font=font(ENG_BOLD,46),fill=dark)
-    d.rounded_rectangle([790,1775,1035,1875],radius=22,fill=red)
-    d.text((820,1800),"Vee News",font=font(ENG_BOLD,28),fill=white)
-    d.text((817,1840),"Always With You",font=font(ENG_BOLD,17),fill=white)
-    d.rectangle([0,1908,WIDTH//3,1920],fill=(255,153,51))
-    d.rectangle([WIDTH//3,1908,2*WIDTH//3,1920],fill=white)
-    d.rectangle([2*WIDTH//3,1908,WIDTH,1920],fill=(19,136,8))
+    d.rectangle([0,1810,WIDTH,1920],fill=yellow)
+    d.text((58,1830),"VEE NEWS",font=font(ENG_BOLD,34),fill=dark)
+    d.text((300,1830),PHONE,font=font(ENG_BOLD,34),fill=dark)
+    d.rectangle([0,1906,WIDTH//3,1920],fill=(255,153,51))
+    d.rectangle([WIDTH//3,1906,2*WIDTH//3,1920],fill=white)
+    d.rectangle([2*WIDTH//3,1906,WIDTH,1920],fill=(19,136,8))
     im.save(OUTPUT,quality=94,optimize=True)
 
 def post_to_facebook(caption):
