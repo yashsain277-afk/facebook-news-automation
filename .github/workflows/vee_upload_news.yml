@@ -1,0 +1,50 @@
+name: Vee News - Upload Photo/Video to Facebook
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "incoming_news/**"
+      - "vee_upload_news.py"
+      - ".github/workflows/vee_upload_news.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  make-and-post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install FFmpeg and Hindi fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-extra fonts-dejavu
+
+      - name: Install Python packages
+        run: |
+          pip install Pillow gTTS
+
+      - name: Create 30-55 second news video and post to Facebook
+        env:
+          VEE_NEWS_PAGE_ID: ${{ secrets.VEE_NEWS_PAGE_ID }}
+          VEE_NEWS_PAGE_ACCESS_TOKEN: ${{ secrets.VEE_NEWS_PAGE_ACCESS_TOKEN }}
+        run: python vee_upload_news.py
+
+      - name: Save generated video and script
+        uses: actions/upload-artifact@v4
+        with:
+          name: vee-news-upload-result
+          path: |
+            vee_upload_news.mp4
+            vee_upload_news_work/script.txt
+            vee_upload_news_work/overlay*.png
+          if-no-files-found: warn
+          retention-days: 3
