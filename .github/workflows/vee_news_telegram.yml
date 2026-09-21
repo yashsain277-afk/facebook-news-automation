@@ -1,0 +1,77 @@
+name: Vee News - Telegram to Facebook
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vee-news-telegram
+  cancel-in-progress: false
+
+jobs:
+  telegram-news:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install FFmpeg and Hindi fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-extra fonts-dejavu
+
+      - name: Install Python packages
+        run: pip install Pillow gTTS
+
+      - name: Check Telegram for new news
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python telegram_news_ingest.py
+
+      - name: Check whether a Telegram news item is ready
+        id: ready
+        shell: bash
+        run: |
+          if [ -f ".telegram_pending_offset" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create video and post to Facebook
+        if: steps.ready.outputs.ready == 'true'
+        env:
+          VEE_INPUT_DIR: telegram_incoming
+          VEE_NEWS_PAGE_ID: ${{ secrets.VEE_NEWS_PAGE_ID }}
+          VEE_NEWS_PAGE_ACCESS_TOKEN: ${{ secrets.VEE_NEWS_PAGE_ACCESS_TOKEN }}
+        run: python vee_upload_news.py
+
+      - name: Commit Telegram offset after successful processing
+        if: success()
+        shell: bash
+        run: |
+          if [ -f ".telegram_pending_offset" ]; then
+            mv .telegram_pending_offset .github/telegram_offset.txt
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/telegram_offset.txt
+          git diff --cached --quiet || git commit -m "Update Telegram news offset"
+          git push
+
+      - name: Clean temporary Telegram input
+        if: always()
+        shell: bash
+        run: |
+          rm -rf telegram_incoming
+          rm -rf vee_upload_news_work
+          rm -f vee_upload_news.mp4 .telegram_pending_offset
