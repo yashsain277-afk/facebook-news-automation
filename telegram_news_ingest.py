@@ -7,7 +7,7 @@ import urllib.error
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 OFFSET_FILE = ".github/telegram_offset.txt"
-INBOX = "incoming_news"
+INBOX = "telegram_incoming"
 ALLOWED_VIDEO = {".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"}
 
 def api(method, params=None):
