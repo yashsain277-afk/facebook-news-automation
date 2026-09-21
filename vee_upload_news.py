@@ -312,15 +312,15 @@ def compose_video(background):
     return out
 
 
-def caption(headline):
-    title = clean(headline)
+def caption(news_text):
+    content = clean(news_text)
     return (
-        f"🏏 Vee News | News Update\n\n{title}\n\n"
+        f"🏏 Vee News | News Update\n\n{content}\n\n"
         "#VeeNews #NewsUpdate #HindiNews #BreakingNews"
     )
 
 
-def post_video(video_path, title_text):
+def post_video(video_path, title_text, news_text):
     if not PAGE_ID or not ACCESS_TOKEN:
         raise RuntimeError("VEE_NEWS_PAGE_ID / VEE_NEWS_PAGE_ACCESS_TOKEN secret is missing.")
 
@@ -333,7 +333,7 @@ def post_video(video_path, title_text):
     fields = [
         ("access_token", ACCESS_TOKEN),
         ("title", clean(title_text)[:80]),
-        ("description", caption(title_text)[:500]),
+        ("description", caption(news_text)),
         ("published", "true"),
     ]
 
@@ -399,7 +399,7 @@ def main():
     print("FINAL_DURATION_SECONDS:", probe[0] if probe else "unknown")
     print("FINAL_SIZE_BYTES:", probe[1] if len(probe) > 1 else "unknown")
 
-    post_video(OUTPUT, headline)
+    post_video(OUTPUT, headline, raw)
     print("UPLOAD_COMPLETE")
 
 
