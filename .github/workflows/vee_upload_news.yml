@@ -6,6 +6,7 @@ on:
     paths:
       - "incoming_news/**"
       - "vee_upload_news.py"
+      - "vee_upload_news_frame.py"
       - ".github/workflows/vee_upload_news.yml"
 
 permissions:
@@ -55,7 +56,7 @@ jobs:
         env:
           VEE_NEWS_PAGE_ID: ${{ secrets.VEE_NEWS_PAGE_ID }}
           VEE_NEWS_PAGE_ACCESS_TOKEN: ${{ secrets.VEE_NEWS_PAGE_ACCESS_TOKEN }}
-        run: python vee_upload_news.py
+        run: python vee_upload_news_frame.py
 
       - name: Save generated video and script
         if: steps.input_check.outputs.ready == 'true'
@@ -73,7 +74,7 @@ jobs:
         if: success() && steps.input_check.outputs.ready == 'true'
         shell: bash
         run: |
-          find incoming_news -maxdepth 1 -type f \(             -iname "*.txt" -o -iname "*.md" -o             -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" -o             -iname "*.mp4" -o -iname "*.mov" -o -iname "*.m4v" -o -iname "*.webm" -o             -iname "*.avi" -o -iname "*.mkv"           \) -delete
+          find incoming_news -maxdepth 1 -type f \(             -iname "*.txt" -o -iname "*.md"             -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp"             -o -iname "*.mp4" -o -iname "*.mov" -o -iname "*.m4v" -o -iname "*.webm"             -o -iname "*.avi" -o -iname "*.mkv"           \) -delete
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A incoming_news
