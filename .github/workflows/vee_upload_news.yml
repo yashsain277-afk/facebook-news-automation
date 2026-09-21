@@ -49,7 +49,7 @@ jobs:
 
       - name: Install Python packages
         if: steps.input_check.outputs.ready == 'true'
-        run: pip install Pillow gTTS
+        run: pip install Pillow gTTS edge-tts
 
       - name: Create 30-55 second news video and post to Facebook
         if: steps.input_check.outputs.ready == 'true'
