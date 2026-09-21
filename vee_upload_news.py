@@ -242,8 +242,28 @@ def make_overlays(headline, body):
 
 def make_voice(script):
     path = os.path.join(WORK, "voice.mp3")
+    voice = os.environ.get("VEE_NEWS_VOICE", "hi-IN-MadhurNeural")
+    try:
+        import subprocess
+        subprocess.run(
+            [
+                "edge-tts",
+                "--voice", voice,
+                "--rate=-5%",
+                "--pitch=0Hz",
+                "--volume=0%",
+                "--text", script,
+                "--write-media", path,
+            ],
+            check=True,
+            timeout=120,
+        )
+        print("VOICE_CREATED: Edge TTS", voice, path)
+        return
+    except Exception as e:
+        print("Edge TTS unavailable, falling back to gTTS:", e)
     gTTS(text=script, lang="hi", slow=False).save(path)
-    print("VOICE_CREATED:", path)
+    print("VOICE_CREATED: gTTS fallback", path)
 
 
 def make_photo_background(media_path):
