@@ -13,7 +13,7 @@ from io import BytesIO
 from gtts import gTTS
 from PIL import Image, ImageDraw, ImageFont
 
-INPUT_DIR = "incoming_news"
+INPUT_DIR = os.environ.get("VEE_INPUT_DIR", "incoming_news")
 WORK = "vee_upload_news_work"
 OUTPUT = "vee_upload_news.mp4"
 W, H = 1080, 1920
