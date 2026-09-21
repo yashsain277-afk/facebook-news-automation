@@ -32,7 +32,7 @@ jobs:
         env:
           VEE_NEWS_PAGE_ID: ${{ secrets.VEE_NEWS_PAGE_ID }}
           VEE_NEWS_PAGE_ACCESS_TOKEN: ${{ secrets.VEE_NEWS_PAGE_ACCESS_TOKEN }}
-        run: python vee_news_automation.py
+        run: python vee_news_reference_frame.py
       - name: Save Vee News history
         run: |
           git config user.name "github-actions[bot]"
