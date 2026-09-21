@@ -53,7 +53,7 @@ jobs:
           VEE_INPUT_DIR: telegram_incoming
           VEE_NEWS_PAGE_ID: ${{ secrets.VEE_NEWS_PAGE_ID }}
           VEE_NEWS_PAGE_ACCESS_TOKEN: ${{ secrets.VEE_NEWS_PAGE_ACCESS_TOKEN }}
-        run: python vee_upload_news.py
+        run: python vee_upload_news_frame.py
 
       - name: Commit Telegram offset after successful processing
         if: success()
@@ -62,7 +62,7 @@ jobs:
           if [ -f ".telegram_pending_offset" ]; then
             mv .telegram_pending_offset .github/telegram_offset.txt
             git config user.name "github-actions[bot]"
-            git config user.email "41898282+users.noreply.github.com"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add .github/telegram_offset.txt
             git diff --cached --quiet || git commit -m "Update Telegram news offset"
             git push
