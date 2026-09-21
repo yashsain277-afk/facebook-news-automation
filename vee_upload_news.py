@@ -332,8 +332,8 @@ def post_video(video_path, title_text):
 
     fields = [
         ("access_token", ACCESS_TOKEN),
-        ("title", clean(title_text)[:200]),
-        ("description", caption(title_text)),
+        ("title", clean(title_text)[:80]),
+        ("description", caption(title_text)[:500]),
         ("published", "true"),
     ]
 
