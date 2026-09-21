@@ -120,7 +120,6 @@ def make_script(raw):
     if body_hi and body_hi != headline_hi:
         script += f"मिली जानकारी के अनुसार, {body_hi.strip(' ।|:-')}। "
     script += (
-        "यह जानकारी उपलब्ध समाचार सामग्री के आधार पर दी जा रही है। "
         "आगे की जानकारी सामने आने पर अपडेट किया जाएगा। "
         "ऐसी ही ताज़ा खबरों के लिए वी न्यूज़ को फॉलो करें।"
     )
@@ -233,7 +232,7 @@ def make_overlays(headline, body):
                 y += 50
         else:
             draw_mixed(d, (55, 1495), "वी न्यूज़", 50, (255, 210, 0), True)
-            draw_mixed(d, (55, 1570), "उपलब्ध जानकारी के आधार पर अपडेट", 35, "white", True)
+            draw_mixed(d, (55, 1570), "ताज़ा न्यूज़ अपडेट", 35, "white", True)
             draw_mixed(d, (55, 1660), "ताज़ा खबरों के लिए VEE NEWS को FOLLOW करें", 31, "white", False)
             d.text((55, 1750), datetime.now(IST).strftime("%d %b %Y | %H:%M IST"),
                    font=ImageFont.truetype(ENG, 27), fill="white")
@@ -317,7 +316,6 @@ def caption(headline):
     title = clean(headline)
     return (
         f"🏏 Vee News | News Update\n\n{title}\n\n"
-        "यह वीडियो उपलब्ध समाचार सामग्री के आधार पर तैयार किया गया है।\n\n"
         "#VeeNews #NewsUpdate #HindiNews #BreakingNews"
     )
 
