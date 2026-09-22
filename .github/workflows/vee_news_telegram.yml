@@ -55,6 +55,20 @@ jobs:
           VEE_NEWS_PAGE_ACCESS_TOKEN: ${{ secrets.VEE_NEWS_PAGE_ACCESS_TOKEN }}
         run: python vee_upload_news_frame.py
 
+      # Commit the Telegram offset immediately after Facebook succeeds.
+      # This prevents the same Telegram message from being posted to Facebook again
+      # if the later HS News Times step fails.
+      - name: Mark Telegram message processed after Facebook success
+        if: success() && steps.ready.outputs.ready == 'true'
+        shell: bash
+        run: |
+          mv .telegram_pending_offset .github/telegram_offset.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/telegram_offset.txt
+          git diff --cached --quiet || git commit -m "Mark Telegram news processed after Facebook post"
+          git push
+
       - name: Post same Telegram news to HS News Times
         if: steps.ready.outputs.ready == 'true'
         env:
@@ -63,20 +77,6 @@ jobs:
         run: |
           export HS_TELEGRAM_FILE="$(ls telegram_incoming/*.txt | head -n 1)"
           python hs_telegram_news.py
-      - name: Commit Telegram offset after successful processing
-        if: success()
-        shell: bash
-        run: |
-          if [ -f ".telegram_pending_offset" ]; then
-            mv .telegram_pending_offset .github/telegram_offset.txt
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add .github/telegram_offset.txt
-            git diff --cached --quiet || git commit -m "Update Telegram news offset"
-            git push
-          else
-            echo "No Telegram offset update needed."
-          fi
 
       - name: Clean temporary Telegram input
         if: always()
