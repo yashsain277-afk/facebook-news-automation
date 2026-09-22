@@ -4,6 +4,10 @@ from PIL import Image, ImageDraw, ImageFont
 PAGE_ID = os.environ["HS_NEWS_PAGE_ID"]
 TOKEN = os.environ["HS_NEWS_PAGE_ACCESS_TOKEN"]
 NEWS_TEXT = os.environ.get("HS_TELEGRAM_TEXT", "").strip()
+TEXT_FILE = os.environ.get("HS_TELEGRAM_FILE", "").strip()
+if not NEWS_TEXT and TEXT_FILE and os.path.exists(TEXT_FILE):
+    with open(TEXT_FILE, "r", encoding="utf-8") as _f:
+        NEWS_TEXT = _f.read().strip()
 OUTPUT = "hs_telegram_news.jpg"
 W,H = 1200,900
 
