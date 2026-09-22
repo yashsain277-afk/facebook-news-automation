@@ -30,13 +30,8 @@ if not os.path.exists(BACKGROUND):
     raise FileNotFoundError(f"Background image not found: {BACKGROUND}")
 
 background = Image.open(BACKGROUND).convert("RGB")
-background = ImageOps.fit(
-    background,
-    (WIDTH, HEIGHT),
-    method=Image.Resampling.LANCZOS,
-    centering=(0.5, 0.5),
-)
-canvas = background.copy()
+background = ImageOps.fit(background, (WIDTH, HEIGHT), method=Image.Resampling.LANCZOS)
+canvas = Image.new("RGB", (WIDTH, HEIGHT), (245, 248, 252))
 draw = ImageDraw.Draw(canvas)
 
 HINDI = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
@@ -44,293 +39,119 @@ HINDI_BOLD = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
 ENGLISH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 ENGLISH_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-for path, label in (
-    (HINDI, "Hindi regular font"),
-    (HINDI_BOLD, "Hindi bold font"),
-    (ENGLISH, "English regular font"),
-    (ENGLISH_BOLD, "English bold font"),
-):
+for path, label in ((HINDI,"Hindi regular"),(HINDI_BOLD,"Hindi bold"),(ENGLISH,"English regular"),(ENGLISH_BOLD,"English bold")):
     if not os.path.exists(path):
-        raise FileNotFoundError(f"{label} not found: {path}")
+        raise FileNotFoundError(f"{label} font not found: {path}")
 
-WHITE = (255, 255, 255)
-BLACK = (15, 25, 45)
-RED = (218, 20, 28)
-BLUE = (10, 48, 125)
-LIGHT_BLUE = (205, 220, 238)
-SOURCE = (95, 120, 155)
+WHITE=(255,255,255); NAVY=(5,35,58); RED=(220,20,30); YELLOW=(255,235,0)
+BLUE=(10,55,125); BLACK=(20,28,40); LIGHT=(242,246,250); GREY=(105,120,135)
 
+def font(path,size):
+    return ImageFont.truetype(path,size)
 
-def font(path, size):
-    return ImageFont.truetype(path, size)
-
-
-def is_hindi(char):
-    return 0x0900 <= ord(char) <= 0x097F
-
-
-def is_ascii_letter(char):
-    return ("A" <= char <= "Z") or ("a" <= char <= "z")
-
-
-def is_number(char):
-    return "0" <= char <= "9"
-
-
-def is_allowed_punctuation(char):
-    return char in " .,।!?;:-–—()/₹'%+&@#*"
-
+def is_hindi(c): return 0x0900 <= ord(c) <= 0x097F
+def is_ascii_letter(c): return ("A"<=c<="Z") or ("a"<=c<="z")
+def is_number(c): return "0"<=c<="9"
+def is_allowed_punctuation(c): return c in " .,।!?;:-–—()/₹'%+&@#*"
 
 def sanitize_text(text):
-    text = unicodedata.normalize("NFC", str(text))
-    cleaned = []
-    for char in text:
-        if (
-            is_hindi(char)
-            or is_ascii_letter(char)
-            or is_number(char)
-            or is_allowed_punctuation(char)
-        ):
-            cleaned.append(char)
-        else:
-            cleaned.append(" ")
-    return re.sub(r"\s+", " ", "".join(cleaned)).strip()
+    text=unicodedata.normalize("NFC",str(text))
+    return re.sub(r"\s+"," ","".join(c if (is_hindi(c) or is_ascii_letter(c) or is_number(c) or is_allowed_punctuation(c)) else " " for c in text)).strip()
 
+def draw_mixed_text(xy,text,size,fill,bold=False):
+    x,y=xy; text=sanitize_text(text)
+    hf=font(HINDI_BOLD if bold else HINDI,size); ef=font(ENGLISH_BOLD if bold else ENGLISH,size)
+    cur=None; seg=""; cx=x
+    for ch in text:
+        typ="hindi" if is_hindi(ch) else "english"
+        if cur and typ!=cur:
+            draw.text((cx,y),seg,font=hf if cur=="hindi" else ef,fill=fill)
+            cx=draw.textbbox((cx,y),seg,font=hf if cur=="hindi" else ef)[2]; seg=""
+        seg+=ch; cur=typ
+    if seg: draw.text((cx,y),seg,font=hf if cur=="hindi" else ef,fill=fill)
 
-def draw_mixed_text(xy, text, size, fill, bold=False):
-    x, y = xy
-    text = sanitize_text(text)
-    if not text:
-        return
+def mixed_text_width(text,size,bold=False):
+    text=sanitize_text(text); hf=font(HINDI_BOLD if bold else HINDI,size); ef=font(ENGLISH_BOLD if bold else ENGLISH,size)
+    return sum(draw.textbbox((0,0),c,font=hf if is_hindi(c) else ef)[2] for c in text)
 
-    hindi_font = font(HINDI_BOLD if bold else HINDI, size)
-    english_font = font(ENGLISH_BOLD if bold else ENGLISH, size)
-
-    current_type = None
-    current_text = ""
-    current_x = x
-
-    def flush(segment, segment_type, x_pos):
-        if not segment:
-            return x_pos
-        segment_font = hindi_font if segment_type == "hindi" else english_font
-        draw.text((x_pos, y), segment, font=segment_font, fill=fill)
-        box = draw.textbbox((x_pos, y), segment, font=segment_font)
-        return box[2]
-
-    for char in text:
-        char_type = "hindi" if is_hindi(char) else "english"
-        if current_type is not None and char_type != current_type:
-            current_x = flush(current_text, current_type, current_x)
-            current_text = ""
-        current_text += char
-        current_type = char_type
-
-    flush(current_text, current_type, current_x)
-
-
-def mixed_text_width(text, size, bold=False):
-    text = sanitize_text(text)
-    if not text:
-        return 0
-
-    hindi_font = font(HINDI_BOLD if bold else HINDI, size)
-    english_font = font(ENGLISH_BOLD if bold else ENGLISH, size)
-
-    width = 0
-    for char in text:
-        fnt = hindi_font if is_hindi(char) else english_font
-        box = draw.textbbox((0, 0), char, font=fnt)
-        width += box[2] - box[0]
-    return width
-
-
-def shorten(text, size, max_width, bold=True):
-    text = sanitize_text(text)
-    if mixed_text_width(text, size, bold) <= max_width:
-        return text
-
-    suffix = "..."
-    result = ""
-
+def shorten(text,size,max_width,bold=True):
+    text=sanitize_text(text)
+    if mixed_text_width(text,size,bold)<=max_width: return text
+    out=""
     for word in text.split():
-        candidate = word if not result else result + " " + word
-        if mixed_text_width(candidate + suffix, size, bold) <= max_width:
-            result = candidate
-        else:
-            break
+        cand=word if not out else out+" "+word
+        if mixed_text_width(cand+"...",size,bold)<=max_width: out=cand
+        else: break
+    return (out+"...") if out else text[:12]+"..."
 
-    if result:
-        return result + suffix
+# --- Permanent HS News Times reference-frame layout ---
+draw.rectangle([0,0,WIDTH,250],fill=NAVY)
+# Decorative background beams.
+draw.polygon([(0,0),(85,0),(0,95)],fill=BLUE)
+draw.polygon([(1110,0),(1200,0),(1200,90)],fill=BLUE)
+draw.polygon([(0,225),(80,150),(92,170),(25,250)],fill=YELLOW)
+draw.polygon([(1200,205),(1140,250),(1115,230),(1180,185)],fill=YELLOW)
 
-    chars = ""
-    for char in text:
-        if mixed_text_width(chars + char + suffix, size, bold) <= max_width:
-            chars += char
-        else:
-            break
+# HS logo block.
+draw.rounded_rectangle([60,25,265,232],radius=25,fill=WHITE)
+draw.ellipse([78,48,247,218],outline=(110,115,120),width=7)
+draw.arc([88,58,237,207],start=210,end=25,fill=(24,155,215),width=12)
+draw.rounded_rectangle([112,92,202,172],radius=8,outline=(30,155,205),width=5)
+draw_mixed_text((128,103),"HS",43,(35,35,35),True)
 
-    return (chars or text[:10]) + suffix
+draw_mixed_text((390,35),"HS",115,YELLOW,True)
+draw.line([(655,42),(655,190)],fill=WHITE,width=3)
+draw_mixed_text((695,38),"News",62,WHITE,False)
+draw_mixed_text((695,105),"Times",62,WHITE,False)
+draw.polygon([(1045,55),(1160,48),(1140,115),(1025,122)],fill=RED)
+draw_mixed_text((1068,57),"हर खबर",30,WHITE,True)
+draw.polygon([(1030,122),(1165,115),(1148,180),(1015,187)],fill=WHITE)
+draw_mixed_text((1050,124),"आपके साथ",28,NAVY,True)
+draw.rectangle([0,250,WIDTH,266],fill=RED)
 
+# Main white card.
+draw.rectangle([25,270,1175,875],fill=WHITE,outline=BLUE,width=4)
+draw.polygon([(185,288),(215,288),(190,365),(160,365)],fill=BLUE)
+draw.polygon([(985,288),(1015,288),(1040,365),(1010,365)],fill=BLUE)
+draw.rounded_rectangle([245,278,955,370],radius=16,fill=RED)
+draw_mixed_text((378,292),"आज की 10 बड़ी खबरें",54,WHITE,True)
 
-def centered_text(text, y, size, fill, bold=False):
-    width = mixed_text_width(text, size, bold)
-    draw_mixed_text(((WIDTH - width) // 2, y), text, size, fill, bold)
+# Left neutral news panel keeps the template reusable for all local-news topics.
+draw.rounded_rectangle([45,390,385,790],radius=18,fill=NAVY,outline=BLUE,width=4)
+draw_mixed_text((92,455),"HS",95,YELLOW,True)
+draw_mixed_text((85,565),"NEWS",55,WHITE,True)
+draw_mixed_text((78,630),"आज की खबरें",34,WHITE,True)
+draw_mixed_text((65,690),"ताज़ा • स्थानीय • हिंदी",24,YELLOW,True)
 
+headline_size=22; source_size=15; start_y=395; row_h=45
+num_font=font(ENGLISH_BOLD,22)
+for i in range(10):
+    y=start_y+i*row_h
+    draw.ellipse([425,y,468,y+43],fill=RED)
+    nb=draw.textbbox((0,0),str(i+1),font=num_font); nw=nb[2]-nb[0]
+    draw.text((446-nw/2,y+7),str(i+1),font=num_font,fill=WHITE)
+    if i < len(items):
+        title=shorten(items[i]["title"],headline_size,545,True)
+        source=shorten(items[i]["source"],source_size,145,False) if items[i]["source"] else ""
+        draw_mixed_text((480,y+3),title,headline_size,BLACK,True)
+        if source:
+            sw=mixed_text_width(source,source_size,False)
+            draw_mixed_text((1110-sw,y+7),source,source_size,GREY,False)
+    draw.line([(480,y+43),(1135,y+43)],fill=(215,222,230),width=1)
 
-# Header: render directly with installed fonts.
-# This avoids the old corrupt WebP header asset and guarantees Hindi glyph support.
-HEADER_BOTTOM = 250
-draw.rectangle([0, 0, WIDTH, HEADER_BOTTOM], fill=BLUE)
-
-centered_text("Veena News", 35, 58, WHITE, True)
-centered_text("सच्ची खबर  |  हर समय  |  आपके साथ", 112, 30, WHITE, True)
-centered_text("आज की बड़ी खबर", 168, 27, WHITE, True)
-
-# Main white panel
-draw.rounded_rectangle([30, 300, 1170, 890], radius=12, fill=WHITE)
-
-# Red title banner
-draw.rounded_rectangle([190, 290, 1010, 390], radius=18, fill=RED)
-
-for x in (145, 172):
-    draw.polygon(
-        [(x, 305), (x + 22, 305), (x - 2, 373), (x - 24, 373)],
-        fill=BLUE,
-    )
-
-for x in (1030, 1057):
-    draw.polygon(
-        [(x, 305), (x + 22, 305), (x + 46, 373), (x + 24, 373)],
-        fill=BLUE,
-    )
-
-title = "आज की 10 बड़ी खबरें"
-title_font_size = 54
-title_width = mixed_text_width(title, title_font_size, bold=True)
-
-draw_mixed_text(
-    ((190 + 1010 - title_width) // 2, 306),
-    title,
-    title_font_size,
-    WHITE,
-    bold=True,
-)
-
-# Ten compact headline rows
-headline_size = 24
-source_size = 16
-number_font = font(ENGLISH_BOLD, 22)
-
-NUMBER_X = 108
-TEXT_X = 160
-TEXT_RIGHT = 1135
-START_Y = 410
-ROW_HEIGHT = 43
-
-for index in range(10):
-    y = START_Y + index * ROW_HEIGHT
-
-    draw.ellipse(
-        [NUMBER_X - 22, y - 2, NUMBER_X + 22, y + 42],
-        fill=RED,
-    )
-
-    number = str(index + 1)
-    nb = draw.textbbox((0, 0), number, font=number_font)
-    nw, nh = nb[2] - nb[0], nb[3] - nb[1]
-
-    draw.text(
-        (NUMBER_X - nw // 2, y + 5 - nh // 2 + 8),
-        number,
-        fill=WHITE,
-        font=number_font,
-    )
-
-    if index < len(items):
-        title_text = sanitize_text(items[index]["title"])
-        source_text = sanitize_text(items[index]["source"])
-
-        source_display = f" | {source_text}" if source_text else ""
-
-        if source_display:
-            source_display = shorten(
-                source_display,
-                source_size,
-                220,
-                bold=False,
-            )
-
-        source_width = mixed_text_width(
-            source_display,
-            source_size,
-            bold=False,
-        )
-
-        title_max_width = TEXT_RIGHT - TEXT_X - source_width - 18
-
-        title_display = shorten(
-            title_text,
-            headline_size,
-            max(420, title_max_width),
-            bold=True,
-        )
-
-        draw_mixed_text(
-            (TEXT_X, y + 1),
-            title_display,
-            headline_size,
-            BLACK,
-            bold=True,
-        )
-
-        if source_display:
-            title_width = mixed_text_width(
-                title_display,
-                headline_size,
-                bold=True,
-            )
-
-            source_x = min(
-                TEXT_X + title_width + 10,
-                TEXT_RIGHT - source_width,
-            )
-
-            draw_mixed_text(
-                (source_x, y + 6),
-                source_display,
-                source_size,
-                SOURCE,
-                bold=False,
-            )
-
-    draw.line(
-        [(TEXT_X, y + 44), (TEXT_RIGHT, y + 44)],
-        fill=LIGHT_BLUE,
-        width=1,
-    )
-
-# Footer
-draw.line([(70, 705), (1130, 705)], fill=BLUE, width=3)
-
-footer_font = font(ENGLISH_BOLD, 25)
-draw.text(
-    (70, 855),
-    "Veena News",
-    fill=BLUE,
-    font=footer_font,
-)
-
-hashtags = "#VeenaNews   #HindiNews   #LocalNews"
-hb = draw.textbbox((0, 0), hashtags, font=font(ENGLISH_BOLD, 18))
-hw = hb[2] - hb[0]
-
-draw.text(
-    (1130 - hw, 858),
-    hashtags,
-    fill=BLUE,
-    font=font(ENGLISH_BOLD, 18),
-)
+# Footer.
+draw.polygon([(0,805),(260,805),(310,875),(0,875)],fill=RED)
+draw_mixed_text((28,820),"HS",55,WHITE,True)
+draw_mixed_text((105,822),"News",30,WHITE,True)
+draw_mixed_text((105,855),"Times",24,WHITE,True)
+draw_mixed_text((390,822),"#HSNewsTimes",22,YELLOW,True)
+draw_mixed_text((610,822),"|",24,WHITE,True)
+draw_mixed_text((650,822),"#HindiNews",22,YELLOW,True)
+draw_mixed_text((830,822),"|",24,WHITE,True)
+draw_mixed_text((870,822),"#LocalNews",22,YELLOW,True)
+draw.polygon([(1040,805),(1200,805),(1200,875),(1010,875)],fill=RED)
+draw_mixed_text((1050,818),"ताज़ा खबरें",24,WHITE,True)
+draw_mixed_text((1050,850),"हर 2 घंटे",27,YELLOW,True)
 
 canvas.save(OUTPUT, quality=95, optimize=True)
 print(f"Final Veena News template image created: {OUTPUT}")
