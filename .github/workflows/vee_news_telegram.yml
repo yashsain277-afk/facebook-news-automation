@@ -55,6 +55,14 @@ jobs:
           VEE_NEWS_PAGE_ACCESS_TOKEN: ${{ secrets.VEE_NEWS_PAGE_ACCESS_TOKEN }}
         run: python vee_upload_news_frame.py
 
+      - name: Post same Telegram news to HS News Times
+        if: steps.ready.outputs.ready == 'true'
+        env:
+          HS_NEWS_PAGE_ID: "1391392690913401"
+          HS_NEWS_PAGE_ACCESS_TOKEN: ${{ secrets.HS_FB_PAGE_ACCESS_TOKEN }}
+        run: |
+          export HS_TELEGRAM_FILE="$(ls telegram_incoming/*.txt | head -n 1)"
+          python hs_telegram_news.py
       - name: Commit Telegram offset after successful processing
         if: success()
         shell: bash
