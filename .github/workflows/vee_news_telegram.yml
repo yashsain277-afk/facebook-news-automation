@@ -55,6 +55,14 @@ jobs:
           VEE_NEWS_PAGE_ACCESS_TOKEN: ${{ secrets.VEE_NEWS_PAGE_ACCESS_TOKEN }}
         run: python vee_upload_news_frame.py
 
+      - name: Post same Telegram news to Janta Ki Awaz
+        if: steps.ready.outputs.ready == 'true'
+        env:
+          JANTA_KI_AWAZ_PAGE_ID: ${{ secrets.JANTA_KI_AWAZ_PAGE_ID }}
+          JANTA_KI_AWAZ_PAGE_ACCESS_TOKEN: ${{ secrets.JANTA_KI_AWAZ_PAGE_ACCESS_TOKEN }}
+          JANTA_INPUT_DIR: telegram_incoming
+        run: python janta_ki_awaz_telegram.py
+
       # Commit the Telegram offset immediately after Facebook succeeds.
       # This prevents the same Telegram message from being posted to Facebook again
       # if the later HS News Times step fails.
