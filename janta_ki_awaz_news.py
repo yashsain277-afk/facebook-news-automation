@@ -93,17 +93,33 @@ def main():
     source = item.get("source", "Google News")
     link = item["link"]
 
+    photo_path = None
+    image_url = item.get("image_url", "")
+    if image_url:
+        try:
+            photo_path = "janta_news_photo.jpg"
+            req = urllib.request.Request(
+                image_url,
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            with urllib.request.urlopen(req, timeout=20) as response:
+                data = response.read()
+            with open(photo_path, "wb") as f:
+                f.write(data)
+        except Exception as exc:
+            print("JANTA HOURLY: article image unavailable:", exc)
+            photo_path = None
+
     output = "janta_ki_awaz_hourly.jpg"
     make_frame(
         headline=title,
-        source=source,
-        photo_path=None,
+        source="",
+        photo_path=photo_path,
         output=output,
     )
 
     caption = (
         f"📰 {title}\n\n"
-        f"स्रोत: {source}\n"
         f"क्षेत्र: अंता | बारां | राजस्थान\n"
         f"समय: {datetime.now(IST).strftime('%d-%m-%Y %H:%M')}\n\n"
         f"#जनताकीआवाज #अंता #बारां #राजस्थान #LocalNews"
