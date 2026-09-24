@@ -208,6 +208,20 @@ def get_news(
             entry
         )
 
+        image_url = ""
+        try:
+            media = entry.get("media_content") or []
+            if media:
+                image_url = media[0].get("url", "") or ""
+        except Exception:
+            pass
+        if not image_url:
+            try:
+                thumbs = entry.get("media_thumbnail") or []
+                if thumbs:
+                    image_url = thumbs[0].get("url", "") or ""
+            except Exception:
+                pass
 
         news_items.append(
             {
@@ -216,6 +230,7 @@ def get_news(
                 "source": source,
                 "category": category,
                 "published": published,
+                "image_url": image_url,
             }
         )
 
