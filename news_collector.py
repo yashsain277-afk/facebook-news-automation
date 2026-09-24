@@ -62,9 +62,12 @@ def clean_title(title):
         r"\s+",
         " ",
         title
-    )
+    ).strip()
 
-    title = title.strip()
+    # Google News commonly appends the publisher after " - ".
+    # Keep the publisher in the separate source field, not in the graphic headline.
+    if " - " in title:
+        title = title.rsplit(" - ", 1)[0].strip()
 
     return title
 
