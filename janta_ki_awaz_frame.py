@@ -78,14 +78,6 @@ def make_frame(headline, source="", photo_path=None, output="janta_ki_awaz.jpg")
         d.text((x, y), line, font=f_head, fill=BLUE)
         y += f_head.size + 12
 
-    src = clean_text(source)
-    if src:
-        sf = font(27, True)
-        src_text = "स्रोत: " + src
-        bbox = d.textbbox((0, 0), src_text, font=sf)
-        d.text(((W-(bbox[2]-bbox[0]))//2, min(y+18, content_bottom-42)),
-               src_text, font=sf, fill=DARK)
-
     base.save(output, format="JPEG", quality=95, optimize=True)
     print("JANTA FRAME CREATED:", output)
 
