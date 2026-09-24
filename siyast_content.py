@@ -2,6 +2,7 @@ import feedparser, json, os, re, html, requests, textwrap
 from datetime import datetime, timezone
 from PIL import Image, ImageDraw, ImageFont
 from urllib.parse import quote
+import subprocess
 
 PAGE_ID=os.environ["FB_PAGE_ID"]; TOKEN=os.environ["FB_PAGE_ACCESS_TOKEN"]
 POSTED_FILE="siyast_posted.json"
@@ -81,14 +82,35 @@ im = Image.open(TEMPLATE_FILE).convert("RGB")
 # The permanent faces, Parliament, party symbols, branding and overall design remain unchanged.
 d = ImageDraw.Draw(im)
 
-font_bold = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf"
-font_reg = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
+def find_hindi_font(style):
+    candidates = [
+        f"Noto Sans Devanagari:style={style}",
+        "Noto Sans Devanagari"
+    ]
+    for pattern in candidates:
+        try:
+            path = subprocess.check_output(
+                ["fc-match", "-f", "%{file}", pattern],
+                text=True
+            ).strip()
+            if path and os.path.isfile(path):
+                return path
+        except Exception:
+            pass
+
+    fallback = {
+        "Bold": "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf",
+        "Regular": "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
+    }
+    if os.path.isfile(fallback[style]):
+        return fallback[style]
+    raise RuntimeError("Noto Sans Devanagari font is not installed")
+
+font_bold = find_hindi_font("Bold")
+font_reg = find_hindi_font("Regular")
 
 def fit_font(path, size):
-    try:
-        return ImageFont.truetype(path, size)
-    except Exception:
-        return ImageFont.truetype(font_bold, size)
+    return ImageFont.truetype(path, size)
 
 f_head = fit_font(font_bold, 38)
 f_sub = fit_font(font_bold, 27)
