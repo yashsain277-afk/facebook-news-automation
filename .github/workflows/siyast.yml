@@ -24,7 +24,8 @@ jobs:
       - name: Install Hindi fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y fonts-noto-core fonts-noto-extra
+          sudo apt-get install -y fonts-noto-core fonts-noto-extra fontconfig
+          fc-cache -f
       - name: Install packages
         run: pip install feedparser Pillow requests
       - name: Post political update
