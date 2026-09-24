@@ -1,5 +1,7 @@
 import feedparser
 import re
+import html
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 
@@ -222,6 +224,32 @@ def get_news(
                     image_url = thumbs[0].get("url", "") or ""
             except Exception:
                 pass
+
+        # Google News RSS often has no image field. In that case, inspect
+        # the article page for a standard Open Graph image.
+        if not image_url:
+            try:
+                req = urllib.request.Request(
+                    link,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                )
+                with urllib.request.urlopen(req, timeout=12) as response:
+                    page = response.read().decode("utf-8", errors="ignore")
+                match = re.search(
+                    r'<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']',
+                    page,
+                    flags=re.I,
+                )
+                if not match:
+                    match = re.search(
+                        r'<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']',
+                        page,
+                        flags=re.I,
+                    )
+                if match:
+                    image_url = html.unescape(match.group(1))
+            except Exception as exc:
+                print(f"Image lookup failed: {exc}")
 
         news_items.append(
             {
