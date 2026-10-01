@@ -75,7 +75,14 @@ def rewrite_to_100_words(title, summary):
     result = " ".join(selected).strip()
     return result
 
-news_rewrite = rewrite_to_100_words(title, summary)
+news_rewrite = rewrite_to_100_words("", summary)
+# Remove a leading copy of the headline if the RSS summary repeats it.
+news_rewrite = re.sub(
+    r"^" + re.escape(title) + r"[s.:,-]*",
+    "",
+    news_rewrite,
+    flags=re.IGNORECASE
+).strip()
 
 caption_parts = [
     f"📰 सियासत | {title}",
@@ -178,26 +185,52 @@ d.rectangle((690, 475, 1190, 558), fill=(215, 30, 30))
 d.rectangle((690, 558, 1190, 620), fill=(242, 195, 0))
 
 headline = re.sub(r"\s+", " ", title).strip()
-headline_lines = textwrap.wrap(
-    headline,
-    width=24,
-    break_long_words=False,
-    break_on_hyphens=False
-)[:4]
 
-# First line(s) on white band.
+# The headline box is only ~480px wide. Choose wrapping and font size
+# dynamically so long English headlines never run outside the template.
+def make_headline_lines(text):
+    for width in (31, 34, 37, 40):
+        lines = textwrap.wrap(
+            text,
+            width=width,
+            break_long_words=False,
+            break_on_hyphens=False
+        )
+        if len(lines) <= 4:
+            return lines
+    return textwrap.wrap(
+        text,
+        width=37,
+        break_long_words=True,
+        break_on_hyphens=True
+    )[:4]
+
+headline_lines = make_headline_lines(headline)
+
+def fit_headline_font(line, max_size=34, min_size=22):
+    size = max_size
+    while size >= min_size:
+        font = font_for_text(line, size)
+        box = d.textbbox((0, 0), line, font=font)
+        if box[2] - box[0] <= 465:
+            return font
+        size -= 1
+    return font_for_text(line, min_size)
+
+# Two lines on white, up to two lines on red.
 y = 397
 for line in headline_lines[:2]:
-    d.text((710, y), line, font=font_for_text(line, 38), fill=(10, 10, 10))
-    y += 42
+    font = fit_headline_font(line)
+    d.text((710, y), line, font=font, fill=(10, 10, 10))
+    y += 40
 
-# If the title needs more lines, put the remaining short portion on the red band.
 remaining = headline_lines[2:]
 if remaining:
     y = 483
     for line in remaining[:2]:
-        d.text((710, y), line, font=font_for_text(line, 38), fill=(255, 255, 255))
-        y += 42
+        font = fit_headline_font(line)
+        d.text((710, y), line, font=font, fill=(255, 255, 255))
+        y += 40
 
 d.text((715, 570), "सियासत • ताज़ा राजनीतिक अपडेट", font=f_sub, fill=(20, 20, 20))
 
