@@ -40,35 +40,19 @@ if not items:
     raise SystemExit("No new Indian political story found. Try the workflow again later.")
 _,category,title,summary,source,link,news_image_url=items[0]
 
-# Keep the post factual and neutral. The text is built from the news item's supplied summary.
-summary=summary[:1600]
-base=(f"यह खबर भारतीय राजनीति से जुड़े एक ताज़ा घटनाक्रम पर आधारित है। "
-      f"उपलब्ध समाचार विवरण के अनुसार, {title}। ")
-if summary:
-    base+=f"समाचार में उपलब्ध विवरण के अनुसार, {summary} "
-base+=("इस घटनाक्रम को समझते समय संबंधित नेता, राजनीतिक दल और संस्थाओं के आधिकारिक बयान "
-       "तथा मूल समाचार रिपोर्ट को प्राथमिक संदर्भ माना जाना चाहिए। "
-       "भारतीय लोकतंत्र में अलग-अलग दलों और नेताओं के फैसलों का प्रभाव नीति, प्रशासन, "
-       "संसद, राज्यों और आम नागरिकों पर अलग-अलग रूप में पड़ सकता है। "
-       "इसलिए इस पोस्ट का उद्देश्य किसी दल या नेता के पक्ष या विपक्ष में राय बनाना नहीं, "
-       "बल्कि उपलब्ध स्रोत के आधार पर घटनाक्रम और उसका संदर्भ सामने रखना है।")
-words=base.split()
-if len(words)<200:
-    base += ("\n\nऐतिहासिक संदर्भ के लिए भारतीय राजनीति में संविधान, संसद, चुनाव, "
-             "संघवाद और राजनीतिक दलों की भूमिका को समझना उपयोगी है। समय के साथ सरकारों "
-             "और विपक्ष ने अलग-अलग परिस्थितियों में महत्वपूर्ण निर्णय लिए हैं। किसी निर्णय "
-             "का मूल्यांकन करते समय उसके समय की परिस्थितियों, उपलब्ध विकल्पों और बाद में "
-             "दिखाई देने वाले परिणामों को अलग-अलग देखना आवश्यक है।")
-words=base.split()
-text=" ".join(words[:390])
-if len(text.split())<200:
-    text+=" यह विषय आगे भी सार्वजनिक बहस और लोकतांत्रिक संस्थाओं के निर्णयों के संदर्भ में महत्वपूर्ण बना रह सकता है।"
+# Keep the Facebook caption short and focused on the actual story.
+# Do not append generic political background/disclaimer paragraphs.
+summary = re.sub(r"\\s+", " ", summary).strip()
+summary = summary[:900]
 
-caption=(f"📰 सियासत | {title}\n\n{text}\n\n"
-         f"📚 संदर्भ / Reference: {source}\n"
-         f"🔗 मूल समाचार: {link}\n\n"
-         f"#Siyasat #IndianPolitics #Bharat #IndianDemocracy #PoliticalNews")
-
+caption_parts = [
+    f"📰 सियासत | {title}",
+    summary,
+    f"📚 संदर्भ / Reference: {source}",
+    f"🔗 मूल समाचार: {link}",
+    "#Siyasat #IndianPolitics #Bharat #PoliticalNews",
+]
+caption = "\\n\\n".join(p for p in caption_parts if p)
 
 
 # Use the single saved Siyasat template image on every post.
