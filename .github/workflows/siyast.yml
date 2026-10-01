@@ -24,8 +24,11 @@ jobs:
       - name: Install Hindi fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y fonts-noto-core fonts-noto-extra fontconfig
+          sudo apt-get install -y fonts-noto-core fonts-noto-extra fonts-noto-ui-core fontconfig
           fc-cache -f
+          test -f /usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf
+          test -f /usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf
+          echo "Hindi font: $(fc-match 'Noto Sans Devanagari' -f '%{file}')"
       - name: Install packages
         run: pip install feedparser Pillow requests
       - name: Post political update
