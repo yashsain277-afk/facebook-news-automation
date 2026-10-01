@@ -44,14 +44,42 @@ _,category,title,summary,source,link,news_image_url=items[0]
 # Keep the headline itself clean; show the publisher separately in the source line.
 title = re.sub(r"\s+-\s*[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", "", title).strip()
 
-# Keep the Facebook caption short and focused on the actual story.
-# Do not append generic political background/disclaimer paragraphs.
-summary = re.sub(r"\s+", " ", summary).strip()
-summary = summary[:900]
+# Rewrite the news into a concise caption of about 100 words.
+# Keep only facts present in the title/available RSS summary; do not add
+# generic political commentary or invented details.
+def rewrite_to_100_words(title, summary):
+    raw = f"{title}. {summary}"
+    raw = html.unescape(raw)
+    raw = re.sub(r"<[^>]+>", " ", raw)
+    raw = re.sub(r"https?://\\S+", " ", raw)
+    raw = re.sub(r"\\s+", " ", raw).strip()
+
+    # Prefer complete sentences. If the source is shorter, use all available text.
+    sentences = re.split(r"(?<=[.!?।])\\s+", raw)
+    selected = []
+    count = 0
+    for sentence in sentences:
+        words = sentence.split()
+        if not words:
+            continue
+        if count + len(words) <= 100:
+            selected.append(sentence)
+            count += len(words)
+        else:
+            remaining = 100 - count
+            if remaining > 0:
+                selected.append(" ".join(words[:remaining]))
+                count = 100
+            break
+
+    result = " ".join(selected).strip()
+    return result
+
+news_rewrite = rewrite_to_100_words(title, summary)
 
 caption_parts = [
     f"📰 सियासत | {title}",
-    summary,
+    news_rewrite,
     f"📚 संदर्भ / Reference: {source}",
     f"🔗 मूल समाचार: {link}",
     "#Siyasat #IndianPolitics #Bharat #PoliticalNews",
