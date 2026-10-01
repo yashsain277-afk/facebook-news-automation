@@ -83,11 +83,17 @@ im = Image.open(TEMPLATE_FILE).convert("RGB")
 d = ImageDraw.Draw(im)
 
 def find_hindi_font(style):
-    candidates = [
-        f"Noto Sans Devanagari:style={style}",
-        "Noto Sans Devanagari"
-    ]
-    for pattern in candidates:
+    # Use the exact Noto Sans Devanagari files first. This avoids fc-match
+    # selecting an unrelated fallback font on GitHub Actions.
+    exact = {
+        "Bold": "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf",
+        "Regular": "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+    }
+    if os.path.isfile(exact[style]):
+        return exact[style]
+
+    # Secondary fallback for environments where the font is installed elsewhere.
+    for pattern in (f"Noto Sans Devanagari:style={style}", "Noto Sans Devanagari"):
         try:
             path = subprocess.check_output(
                 ["fc-match", "-f", "%{file}", pattern],
@@ -98,19 +104,20 @@ def find_hindi_font(style):
         except Exception:
             pass
 
-    fallback = {
-        "Bold": "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf",
-        "Regular": "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
-    }
-    if os.path.isfile(fallback[style]):
-        return fallback[style]
     raise RuntimeError("Noto Sans Devanagari font is not installed")
 
 font_bold = find_hindi_font("Bold")
 font_reg = find_hindi_font("Regular")
 
 def fit_font(path, size):
-    return ImageFont.truetype(path, size)
+    # RAQM gives proper Indic shaping when the Pillow build provides it.
+    try:
+        return ImageFont.truetype(
+            path, size,
+            layout_engine=ImageFont.Layout.RAQM
+        )
+    except (AttributeError, ValueError):
+        return ImageFont.truetype(path, size)
 
 f_head = fit_font(font_bold, 38)
 f_sub = fit_font(font_bold, 27)
