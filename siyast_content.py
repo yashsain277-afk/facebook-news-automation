@@ -70,8 +70,10 @@ def find_hindi_font(style):
     # Use the exact Noto Sans Devanagari files first. This avoids fc-match
     # selecting an unrelated fallback font on GitHub Actions.
     exact = {
-        "Bold": "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf",
-        "Regular": "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+        # UI variants have broader fallback coverage for mixed Hindi/English
+        # text and are safer for social-media headline rendering.
+        "Bold": "/usr/share/fonts/truetype/noto/NotoSansDevanagariUI-Bold.ttf",
+        "Regular": "/usr/share/fonts/truetype/noto/NotoSansDevanagariUI-Regular.ttf",
     }
     if os.path.isfile(exact[style]):
         return exact[style]
@@ -133,6 +135,8 @@ def has_devanagari(text):
     return any("\u0900" <= ch <= "\u097f" for ch in text)
 
 def font_for_text(text, size=38):
+    # Use the UI Devanagari font for any line containing Hindi.
+    # It also contains Latin glyphs, so mixed headlines stay consistent.
     return fit_font(font_bold if has_devanagari(text) else latin_bold, size)
 
 # Right-side headline block in the saved 1200x800 template.
