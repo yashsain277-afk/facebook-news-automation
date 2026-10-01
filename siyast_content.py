@@ -93,8 +93,28 @@ def find_hindi_font(style):
 font_bold = find_hindi_font("Bold")
 font_reg = find_hindi_font("Regular")
 
+def find_latin_font(style):
+    exact = {
+        "Bold": "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+        "Regular": "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+    }
+    if os.path.isfile(exact[style]):
+        return exact[style]
+    for pattern in (f"Noto Sans:style={style}", "Noto Sans", "DejaVu Sans"):
+        try:
+            path = subprocess.check_output(
+                ["fc-match", "-f", "%{file}", pattern],
+                text=True
+            ).strip()
+            if path and os.path.isfile(path):
+                return path
+        except Exception:
+            pass
+    raise RuntimeError("Latin font is not installed")
+
+latin_bold = find_latin_font("Bold")
+
 def fit_font(path, size):
-    # RAQM gives proper Indic shaping when the Pillow build provides it.
     try:
         return ImageFont.truetype(
             path, size,
@@ -103,8 +123,17 @@ def fit_font(path, size):
     except (AttributeError, ValueError):
         return ImageFont.truetype(path, size)
 
-f_head = fit_font(font_bold, 38)
+# IMPORTANT: the news title is often English, while the Siyasat label is Hindi.
+# Using a Devanagari-only font for an English title produces □□□ glyph boxes.
+f_head_hi = fit_font(font_bold, 38)
+f_head_en = fit_font(latin_bold, 38)
 f_sub = fit_font(font_bold, 27)
+
+def has_devanagari(text):
+    return any("\u0900" <= ch <= "\u097f" for ch in text)
+
+def font_for_text(text, size=38):
+    return fit_font(font_bold if has_devanagari(text) else latin_bold, size)
 
 # Right-side headline block in the saved 1200x800 template.
 # Cover the old baked-in headline, then redraw the new headline in the same style.
@@ -123,7 +152,7 @@ headline_lines = textwrap.wrap(
 # First line(s) on white band.
 y = 397
 for line in headline_lines[:2]:
-    d.text((710, y), line, font=f_head, fill=(10, 10, 10))
+    d.text((710, y), line, font=font_for_text(line, 38), fill=(10, 10, 10))
     y += 42
 
 # If the title needs more lines, put the remaining short portion on the red band.
@@ -131,7 +160,7 @@ remaining = headline_lines[2:]
 if remaining:
     y = 483
     for line in remaining[:2]:
-        d.text((710, y), line, font=f_head, fill=(255, 255, 255))
+        d.text((710, y), line, font=font_for_text(line, 38), fill=(255, 255, 255))
         y += 42
 
 d.text((715, 570), "सियासत • ताज़ा राजनीतिक अपडेट", font=f_sub, fill=(20, 20, 20))
