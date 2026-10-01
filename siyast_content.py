@@ -40,9 +40,13 @@ if not items:
     raise SystemExit("No new Indian political story found. Try the workflow again later.")
 _,category,title,summary,source,link,news_image_url=items[0]
 
+# Google News often appends the publisher domain to the title.
+# Keep the headline itself clean; show the publisher separately in the source line.
+title = re.sub(r"\s+-\s*[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", "", title).strip()
+
 # Keep the Facebook caption short and focused on the actual story.
 # Do not append generic political background/disclaimer paragraphs.
-summary = re.sub(r"\\s+", " ", summary).strip()
+summary = re.sub(r"\s+", " ", summary).strip()
 summary = summary[:900]
 
 caption_parts = [
@@ -52,7 +56,7 @@ caption_parts = [
     f"🔗 मूल समाचार: {link}",
     "#Siyasat #IndianPolitics #Bharat #PoliticalNews",
 ]
-caption = "\\n\\n".join(p for p in caption_parts if p)
+caption = "\n\n".join(p for p in caption_parts if p)
 
 
 # Use the single saved Siyasat template image on every post.
