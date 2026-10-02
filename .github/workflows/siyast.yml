@@ -21,14 +21,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install Hindi fonts
+      - name: Install Hindi fonts (fast)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y fonts-noto-core fonts-noto-extra fonts-noto-ui-core fontconfig
+          # Do NOT install fonts-noto-extra: it is ~78 MB and can make the
+          # GitHub runner spend a very long time downloading fonts.
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-noto-ui-core fontconfig
           fc-cache -f
           test -f /usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf
           test -f /usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf
-          echo "Hindi font: $(fc-match 'Noto Sans Devanagari' -f '%{file}')"
+          test -f /usr/share/fonts/truetype/noto/NotoSansDevanagariUI-Regular.ttf
+          test -f /usr/share/fonts/truetype/noto/NotoSansDevanagariUI-Bold.ttf
+          echo "Hindi font: $(fc-match 'Noto Sans Devanagari UI' -f '%{file}')"
       - name: Install packages
         run: pip install feedparser Pillow requests
       - name: Post political update
